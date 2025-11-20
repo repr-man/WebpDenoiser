@@ -20,6 +20,7 @@ def dataset(datasetroot: Annotated[str | None, typer.Argument()] = None):
     (root / "delta").mkdir(parents=True, exist_ok=True)
     (root / "mask").mkdir(parents=True, exist_ok=True)
     (root / "final").mkdir(parents=True, exist_ok=True)
+    (root / "conv1").mkdir(parents=True, exist_ok=True)
 
     # Download the dataset.
     loadDataset_GooglePng(root)

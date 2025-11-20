@@ -1,8 +1,9 @@
+import numpy as np
 from pathlib import Path
 from flask import Flask, Request, request, jsonify
 from flask_cors import CORS
 
-from graph import FinalNode, MaskNode, PngNode, WebpNode
+from graph import FinalNode, MaskNode, PngNode, WebpNode, Conv1Node
 
 flaskServer = Flask(__name__)
 _ = CORS(flaskServer)
@@ -105,3 +106,18 @@ def requestGetFinal():
     """
     root, fileName = getProjectParts(request)
     return FinalNode().getBytes(root, fileName)
+
+@flaskServer.route("/get-image-conv1", methods=["POST"])
+def requestGetConv1():
+    """
+    Receives a JSON payload of the form:
+    {
+        "projectRoot": "/path/to/root/dir",
+        "fileName": "filename.png"
+    }
+    Returns the contents of the file at
+    '/path/to/root/dir/final/filename.png'.
+    """
+    root, fileName = getProjectParts(request)
+    matrix = np.array(request.get_json()["matrixValues"])
+    return Conv1Node(matrix).getBytes(root, fileName)

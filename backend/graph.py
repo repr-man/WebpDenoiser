@@ -1,3 +1,5 @@
+from logging import Logger
+import cv2
 import numpy as np
 from pathlib import Path
 from typing import final, override
@@ -5,8 +7,17 @@ from typing import final, override
 from PIL import Image
 
 class Node:
-    def __init__(self):
+    def __init__(self, log: Logger | None = None):
         self.parents: list[Node] = []
+        self._log: Logger | None = log
+
+    def log(self, message: str):
+        """
+        Use this method for debugging.  It has to exist because Flask is stupid
+        and doesn't let you `print` things.
+        """
+        if self._log is not None:
+            self._log.warning(message)
 
     def needsRerun(self, projectRoot: Path, fileName: str) -> bool:
         ...
@@ -45,8 +56,8 @@ class PngNode(Node):
 
 @final
 class WebpNode(Node):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, log: Logger | None = None):
+        super().__init__(log)
         self.parents = [PngNode()]
 
     @override
@@ -78,8 +89,8 @@ class WebpNode(Node):
 
 @final
 class DeltaNode(Node):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, log: Logger | None = None):
+        super().__init__(log)
         self.parents = [PngNode(), WebpNode()]
 
     @override
@@ -111,8 +122,8 @@ class DeltaNode(Node):
 
 @final
 class MaskNode(Node):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, log: Logger | None = None):
+        super().__init__(log)
         self.parents = [DeltaNode(), PngNode()]
 
     @override
@@ -147,8 +158,8 @@ class MaskNode(Node):
 
 @final
 class FinalNode(Node):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, log: Logger | None = None):
+        super().__init__(log)
         self.parents = [WebpNode(), DeltaNode()]
 
     @override
@@ -180,4 +191,40 @@ class FinalNode(Node):
         if self.needsRerun(projectRoot, fileName):
             self.run(projectRoot, fileName)
         path = projectRoot / "final" / fileName
+        return path.read_bytes()
+
+@final
+class Conv1Node(Node):
+    def __init__(self, matrix: np.ndarray, log: Logger | None = None):
+        super().__init__(log)
+        self.parents = [WebpNode()]
+        self.matrix = matrix
+
+    @override
+    def needsRerun(self, projectRoot: Path, fileName: str):
+        return True
+
+    @override
+    def run(self, projectRoot: Path, fileName: str):
+        super().run(projectRoot, fileName)
+        webpPath = projectRoot / "webp" / fileName.replace(".png", ".webp")
+        conv1Path = projectRoot / "conv1" / fileName
+        imageMat = cv2.imread(str(webpPath), cv2.IMREAD_UNCHANGED)
+        if imageMat is None:
+            raise Exception("Failed to read image")
+        transformed = cv2.filter2D(imageMat, -1, self.matrix)
+        _ = cv2.imwrite(str(conv1Path), transformed)
+
+    @override
+    def getImage(self, projectRoot: Path, fileName: str):
+        if self.needsRerun(projectRoot, fileName):
+            self.run(projectRoot, fileName)
+        path = projectRoot / "conv1" / fileName
+        return Image.open(path).convert("RGB")
+
+    @override
+    def getBytes(self, projectRoot: Path, fileName: str):
+        if self.needsRerun(projectRoot, fileName):
+            self.run(projectRoot, fileName)
+        path = projectRoot / "conv1" / fileName
         return path.read_bytes()
