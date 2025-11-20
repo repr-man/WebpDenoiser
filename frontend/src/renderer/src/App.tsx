@@ -1,17 +1,53 @@
-import type { Component } from 'solid-js'
-import Carousel from './Carousel'
-import Viewer from './Viewer'
+import { createSignal, Match, Switch, type Component } from 'solid-js'
+import SubtractionViewer from './SubtractionViewer'
+import ConvolutionViewer from './ConvolutionViewer'
+
+const enum Screen {
+  Subtraction,
+  Convolution,
+}
 
 const App: Component = () => {
+  const [screen, setScreen] = createSignal(Screen.Subtraction)
+
+  const SidebarButton = (props: { screen: Screen }) => {
+    return (
+      <button
+        class={`
+          w-full aspect-square
+          text-white
+          ${props.screen === screen() ? 'bg-zinc-900' : 'bg-zinc-950'}
+        `}
+        onClick={() => {
+          setScreen(props.screen);
+        }}
+        >
+        </button>
+    )
+  }
+
   return (
     <div class="
       w-screen h-screen
-      p-2
       bg-zinc-900
-      flex flex-col gap-2
+      flex flex-row
       ">
-      <Carousel />
-      <Viewer />
+      <div class="
+        h-full basis-8
+        bg-zinc-950
+        flex flex-col
+        ">
+        <SidebarButton screen={Screen.Subtraction} />
+        <SidebarButton screen={Screen.Convolution} />
+      </div>
+      <Switch>
+        <Match when={screen() === Screen.Subtraction}>
+          <SubtractionViewer />
+        </Match>
+        <Match when={screen() === Screen.Convolution}>
+          <ConvolutionViewer />
+        </Match>
+      </Switch>
     </div>
   )
 }

@@ -1,35 +1,40 @@
 import { Component, createResource, For, Suspense } from 'solid-js'
 import { createStore } from 'solid-js/store'
-import { getImage, ImageType, state } from './model'
+import { getImage, ImageType } from './subtractionModel'
 
-const AsyncImage: Component<{ fileName: string }> = (props) => {
-  const [imageBlobUrl] = createResource(props.fileName, (fileName) => getImage(fileName, ImageType.Orig));
+type PartialState = {
+  projectRoot: string | undefined;
+  selectedImageFileName: string | undefined;
+}
+
+const AsyncImage: Component<{ fileName: string, state: PartialState }> = (props) => {
+  const [imageBlobUrl] = createResource(props.fileName, (fileName) => getImage(fileName, ImageType.Orig, props.state));
   return (
     <img class="
       w-full h-full
       object-contain
       "
       src={imageBlobUrl()}
-      onClick={() => {state.selectedImageFileName = props.fileName}}
+      onClick={() => {props.state.selectedImageFileName = props.fileName}}
     />
   )
 }
 
-const Carousel: Component = () => {
+const Carousel: Component<{ state: PartialState }> = (props) => {
   const [images, setImages] = createStore<string[]>([])
 
   async function onAddClicked() {
     try {
       const dir = await window.electron.selectDirectory()
-      if (!dir) return
-      state.projectRoot = dir
+      if (!dir) return;
+        props.state.projectRoot = dir
       const pngs = await fetch('http://localhost:5000/get-carousel-pngs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          projectRoot: state.projectRoot,
+          projectRoot: props.state.projectRoot,
         }),
       })
       setImages(await pngs.json())
@@ -40,8 +45,8 @@ const Carousel: Component = () => {
 
   function onDelClicked() {
     setImages([])
-    state.projectRoot = undefined
-    state.selectedImageFileName = undefined
+    props.state.projectRoot = undefined
+    props.state.selectedImageFileName = undefined
   }
 
   return (
@@ -70,7 +75,7 @@ const Carousel: Component = () => {
         <For each={images}>
           {(it) =>
             <Suspense>
-              <AsyncImage fileName={it} />
+              <AsyncImage fileName={it} state={props.state} />
             </Suspense>
           }
         </For>
