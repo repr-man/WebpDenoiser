@@ -36,7 +36,7 @@ displayed in the carousel.  This happens in the `requestGetCarouselPngs()` funct
 When the user clicks on an image, the app will request the visual forms of the image
 at each stage of the pipeline.  This happens in the `requestGet*()` functions.
 
-## Wait!  I don't see any transformations happening.  And what's with all the Node stuff?
+## Wait!  I don't see any image transformations happening in the code.  And what's with all the `Node` stuff?
 
 A problem with using a web-based technology for the frontend is that it makes a lot
 of asynchronous requests with no ordering.  This means that the app could ask for

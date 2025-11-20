@@ -1,6 +1,7 @@
 # Webp Reconstruction
 
-A set of tools for training machine learning models that remove compression artifacts from Webp images.
+A set of tools for training machine learning models that remove compression artifacts from Webp
+images.
 
 ## Help! I'm lost!
 
@@ -77,5 +78,5 @@ python main.py train
 
 ## Interjection!
 
-When you want to learn more about the structure of each portion of the project, you can read the README.md
-files in the `backend` and `frontend` directories.
+When you want to learn more about the structure of each portion of the project, you can read the
+README.md files in the `backend` and `frontend` directories.
