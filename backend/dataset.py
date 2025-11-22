@@ -1,5 +1,9 @@
-from pathlib import Path
 from huggingface_hub import snapshot_download
+from pathlib import Path
+import requests
+import zipfile
+from os import rename, remove, rmdir
+import shutil
 
 def loadDataset_GooglePng(root: Path):
     orig = root / "orig"
@@ -68,3 +72,26 @@ def loadDataset_GooglePng(root: Path):
     (orig / "downloaded_image_png1133.png").unlink()
     # Triangle Comparison
     (orig / "downloaded_image_png164.png").unlink()
+
+
+
+def loadDataset_CID22(root: Path):
+    orig = root / "orig"
+    tmpzip = orig / "CID22.zip"
+    with open(tmpzip, "wb") as f:
+        print("Downloading CID22 dataset... (will take a while)")
+        res = requests.get(
+            "https://cloudinary-marketing-res.cloudinary.com/raw/upload/v1682032119/CID22.zip",
+            stream=True,
+        )
+        for chunk in res.iter_content(chunk_size=1024):
+            _ = f.write(chunk)
+    with zipfile.ZipFile(tmpzip, "r") as zipObj:
+        print("Extracting CID22 dataset...")
+        zipObj.extractall(path=orig)
+    for file in (orig / "CID22" / "original").iterdir():
+        rename(file, orig / file.name)
+    remove(tmpzip)
+    remove(orig / "LICENSE")
+    shutil.rmtree(orig / "CID22")
+

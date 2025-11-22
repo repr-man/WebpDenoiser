@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing_extensions import Annotated
 import typer
-from dataset import loadDataset_GooglePng
+from dataset import loadDataset_CID22, loadDataset_GooglePng
 from server import flaskServer
 
 app = typer.Typer()
@@ -23,7 +23,8 @@ def dataset(datasetroot: Annotated[str | None, typer.Argument()] = None):
     (root / "conv1").mkdir(parents=True, exist_ok=True)
 
     # Download the dataset.
-    loadDataset_GooglePng(root)
+    #loadDataset_GooglePng(root)
+    loadDataset_CID22(root)
 
 
 @app.command()
