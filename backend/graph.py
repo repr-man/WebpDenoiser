@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import final, override
 
 from PIL import Image
+from torch import Tensor
+from torchvision.transforms.functional import to_tensor
 
 class Node:
     def __init__(self, cacheDirName: str, fileExt: str, parents: list["Node"], log: Logger | None = None):
@@ -41,6 +43,11 @@ class Node:
         if self.needsRerun(projectRoot, fileName):
             self.run(projectRoot, fileName)
         return self.getPath(projectRoot, fileName).read_bytes()
+    
+    def getTensor(self, projectRoot: Path, fileName: str) -> Tensor:
+        if self.needsRerun(projectRoot, fileName):
+            self.run(projectRoot, fileName)
+        return to_tensor(Image.open(self.getPath(projectRoot, fileName)).convert("RGB"))
 
 
 class PngNode(Node):
@@ -88,6 +95,15 @@ class DeltaNode(Node):
     @override
     def getImage(self, projectRoot: Path, fileName: str) -> Image.Image:
         raise NotImplementedError
+
+    @override
+    def getTensor(self, projectRoot: Path, fileName: str) -> Tensor:
+        if self.needsRerun(projectRoot, fileName):
+            self.run(projectRoot, fileName)
+        delta = np.fromfile(self.getPath(projectRoot, fileName), dtype=np.int16)
+        image = self.parents[1].getImage(projectRoot, fileName)
+        delta = delta.reshape(image.height, image.width, 3)
+        return to_tensor(delta)
 
 
 @final

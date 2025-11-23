@@ -67,7 +67,7 @@ def requestGetFinal():
 ```
 Now, you can implement your step node.
 
-`Node`s have 5 methods that you must implement / override:
+`Node`s have 6 methods that you must implement / override:
 1. `__init__()` - This function *must* start with `super().__init__()`.  If your
    `Node` requires any other steps to be run before it, you must initialize the
    `parents` field with a list of `Node`s, calling their constructors:
@@ -84,3 +84,6 @@ Now, you can implement your step node.
 5. `getBytes` - This function should return the bytes of the image.  It is usually
    the method called by the server's request handler to get the image that is sent
    to the frontend.
+6. `getTensor` - This function should return a `Tensor` object.  It is used for
+   interfacing with Torch.  There are several predefined conversion functions
+   in the 'torchvision' package that are helpful for this.
