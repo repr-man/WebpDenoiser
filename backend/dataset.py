@@ -4,11 +4,13 @@ import numpy as np
 from pathlib import Path
 import requests
 import zipfile
-from os import rename, remove, rmdir
+from os import rename, remove
 import shutil
 from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision.io.image import decode_image
+
+from graph import DeltaNode, WebpNode
 
 def loadDataset_GooglePng(root: Path):
     orig = root / "orig"
@@ -121,12 +123,9 @@ class OurDataset(Dataset[tuple[Tensor, Tensor]]):
 
     @override
     def __getitem__(self, index: int):
-        webp = decode_image(str(self.root / "webp" / self.filenames[index].replace(".png", ".webp")))
-        delta = np.fromfile(
-                self.root / "delta" / self.filenames[index].replace(".png", ".bin"),
-                dtype=np.int16
-            ).reshape(webp.shape)
-        return webp, Tensor(delta)
+        webp = WebpNode().getTensor(self.root, self.filenames[index])
+        delta = DeltaNode().getTensor(self.root, self.filenames[index])
+        return webp, delta
 
     def __len__(self):
         return len(self.filenames)
