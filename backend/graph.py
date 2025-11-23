@@ -193,5 +193,21 @@ class UNetVisualizationNode(Node):
     def run(self, projectRoot: Path, fileName: str):
         super().run(projectRoot, fileName)
         outputPath = self.getPath(projectRoot, fileName)
-        pilImg = to_pil_image(self.parents[0].getTensor(projectRoot, fileName))
-        pilImg.save(outputPath)
+        tensor = self.parents[0].getTensor(projectRoot, fileName)
+        tensor += 128
+        pilImg = to_pil_image(tensor)
+        pilImg.save(outputPath, format="png")
+
+@final
+class ReconstructedNode(Node):
+    def __init__(self, log: Logger | None = None):
+        super().__init__("reconstructed", ".png", [UNetComputationNode(log)], log)
+
+    @override
+    def run(self, projectRoot: Path, fileName: str):
+        super().run(projectRoot, fileName)
+        outputPath = self.getPath(projectRoot, fileName)
+        tensor = self.parents[0].getTensor(projectRoot, fileName)
+        tensor += 128
+        pilImg = to_pil_image(tensor)
+        pilImg.save(outputPath, format="png")
