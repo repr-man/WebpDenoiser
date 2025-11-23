@@ -7,8 +7,10 @@ from typing import final, override
 from PIL import Image
 
 class Node:
-    def __init__(self, log: Logger | None = None):
-        self.parents: list[Node] = []
+    def __init__(self, cacheDirName: str, fileExt: str, parents: list["Node"], log: Logger | None = None):
+        self.parents: list[Node] = parents
+        self.cacheDirName: str = cacheDirName
+        self.fileExt: str = fileExt
         self._log: Logger | None = log
 
     def log(self, message: str):
@@ -19,8 +21,11 @@ class Node:
         if self._log is not None:
             self._log.warning(message)
 
+    def getPath(self, projectRoot: Path, fileName: str) -> Path:
+        return projectRoot / self.cacheDirName / fileName.replace(".png", self.fileExt)
+
     def needsRerun(self, projectRoot: Path, fileName: str) -> bool:
-        ...
+        return not self.getPath(projectRoot, fileName).exists()
 
     def run(self, projectRoot: Path, fileName: str):
         for parent in self.parents:
@@ -28,13 +33,20 @@ class Node:
                 parent.run(projectRoot, fileName)
 
     def getImage(self, projectRoot: Path, fileName: str) -> Image.Image:
-        ...
+        if self.needsRerun(projectRoot, fileName):
+            self.run(projectRoot, fileName)
+        return Image.open(self.getPath(projectRoot, fileName)).convert("RGB")
 
     def getBytes(self, projectRoot: Path, fileName: str) -> bytes:
-        ...
+        if self.needsRerun(projectRoot, fileName):
+            self.run(projectRoot, fileName)
+        return self.getPath(projectRoot, fileName).read_bytes()
 
 
 class PngNode(Node):
+    def __init__(self, log: Logger | None = None):
+        super().__init__("orig", ".png", [], log)
+
     @override
     def needsRerun(self, projectRoot: Path, fileName: str):
         return False
@@ -43,61 +55,25 @@ class PngNode(Node):
     def run(self, projectRoot: Path, fileName: str):
         pass
 
-    @override
-    def getImage(self, projectRoot: Path, fileName: str):
-        path = projectRoot / "orig" / fileName
-        return Image.open(path).convert("RGB")
-
-    @override
-    def getBytes(self, projectRoot: Path, fileName: str):
-        path = projectRoot / "orig" / fileName
-        return path.read_bytes()
-
 
 @final
 class WebpNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__(log)
-        self.parents = [PngNode()]
-
-    @override
-    def needsRerun(self, projectRoot: Path, fileName: str):
-        path = projectRoot / "webp" / fileName.replace(".png", ".webp")
-        return not path.exists()
+        super().__init__("webp", ".webp", [PngNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
         super().run(projectRoot, fileName)
-        path = projectRoot / "webp" / fileName.replace(".png", ".webp")
+        path = self.getPath(projectRoot, fileName)
         png = self.parents[0].getImage(projectRoot, fileName)
         _ = png.convert("RGB").save(path, format="webp")
-        
-    @override
-    def getImage(self, projectRoot: Path, fileName: str):
-        if self.needsRerun(projectRoot, fileName):
-            self.run(projectRoot, fileName)
-        path = projectRoot / "webp" / fileName.replace(".png", ".webp")
-        return Image.open(path).convert("RGB")
-
-    @override
-    def getBytes(self, projectRoot: Path, fileName: str):
-        if self.needsRerun(projectRoot, fileName):
-            self.run(projectRoot, fileName)
-        path = projectRoot / "webp" / fileName.replace(".png", ".webp")
-        return path.read_bytes()
 
 
 @final
 class DeltaNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__(log)
-        self.parents = [PngNode(), WebpNode()]
+        super().__init__("delta", ".bin", [PngNode(log), WebpNode(log)], log)
 
-    @override
-    def needsRerun(self, projectRoot: Path, fileName: str):
-        path = projectRoot / "delta" / fileName.replace(".png", ".bin")
-        return not path.exists()
-            
     @override
     def run(self, projectRoot: Path, fileName: str):
         super().run(projectRoot, fileName)
@@ -107,30 +83,17 @@ class DeltaNode(Node):
         webpArr = np.array(webp, dtype=np.int16)
         delta = pngArr - webpArr
         delta = delta.reshape(png.size[0], png.size[1], 3)
-        delta.tofile(projectRoot / "delta" / fileName.replace(".png", ".bin"))
+        delta.tofile(self.getPath(projectRoot, fileName))
             
     @override
     def getImage(self, projectRoot: Path, fileName: str) -> Image.Image:
         raise NotImplementedError
 
-    @override
-    def getBytes(self, projectRoot: Path, fileName: str):
-        if self.needsRerun(projectRoot, fileName):
-            self.run(projectRoot, fileName)
-        path = projectRoot / "delta" / fileName.replace(".png", ".bin")
-        return np.fromfile(path, dtype=np.int16).tobytes()
-
 
 @final
 class MaskNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__(log)
-        self.parents = [DeltaNode(), PngNode()]
-
-    @override
-    def needsRerun(self, projectRoot: Path, fileName: str):
-        path = projectRoot / "mask" / fileName
-        return not path.exists()
+        super().__init__("mask", ".png", [DeltaNode(log), PngNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
@@ -139,34 +102,14 @@ class MaskNode(Node):
         deltaBytes = self.parents[0].getBytes(projectRoot, fileName)
         deltaArr = np.frombuffer(deltaBytes, dtype=np.int16)
         mask = (deltaArr + 128).astype(np.uint8).tobytes()
-        path = projectRoot / "mask" / fileName
+        path = self.getPath(projectRoot, fileName)
         Image.frombytes("RGB", png.size, mask).save(path)
-
-    @override
-    def getImage(self, projectRoot: Path, fileName: str):
-        if self.needsRerun(projectRoot, fileName):
-            self.run(projectRoot, fileName)
-        path = projectRoot / "mask" / fileName
-        return Image.open(path).convert("RGB")
-
-    @override
-    def getBytes(self, projectRoot: Path, fileName: str):
-        if self.needsRerun(projectRoot, fileName):
-            self.run(projectRoot, fileName)
-        path = projectRoot / "mask" / fileName
-        return path.read_bytes()
 
 
 @final
 class FinalNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__(log)
-        self.parents = [WebpNode(), DeltaNode()]
-
-    @override
-    def needsRerun(self, projectRoot: Path, fileName: str):
-        path = projectRoot / "final" / fileName
-        return not path.exists()
+        super().__init__("final", ".png", [WebpNode(log), DeltaNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
@@ -177,28 +120,13 @@ class FinalNode(Node):
         deltaArr = np.frombuffer(deltaBytes, dtype=np.int16)
         finalArr = webpArr + deltaArr
         finalBytes = finalArr.astype(np.uint8).tobytes()
-        path = projectRoot / "final" / fileName
+        path = self.getPath(projectRoot, fileName)
         Image.frombytes("RGB", webp.size, finalBytes).save(path)
-
-    @override
-    def getImage(self, projectRoot: Path, fileName: str):
-        if self.needsRerun(projectRoot, fileName):
-            self.run(projectRoot, fileName)
-        path = projectRoot / "final" / fileName
-        return Image.open(path).convert("RGB")
-
-    @override
-    def getBytes(self, projectRoot: Path, fileName: str):
-        if self.needsRerun(projectRoot, fileName):
-            self.run(projectRoot, fileName)
-        path = projectRoot / "final" / fileName
-        return path.read_bytes()
 
 @final
 class Conv1Node(Node):
     def __init__(self, matrix: np.ndarray, log: Logger | None = None):
-        super().__init__(log)
-        self.parents = [WebpNode()]
+        super().__init__("conv1", ".png", [WebpNode(log)], log)
         self.matrix = matrix
 
     @override
@@ -208,24 +136,10 @@ class Conv1Node(Node):
     @override
     def run(self, projectRoot: Path, fileName: str):
         super().run(projectRoot, fileName)
-        webpPath = projectRoot / "webp" / fileName.replace(".png", ".webp")
-        conv1Path = projectRoot / "conv1" / fileName
+        webpPath = self.parents[0].getPath(projectRoot, fileName)
+        conv1Path = self.getPath(projectRoot, fileName)
         imageMat = cv2.imread(str(webpPath), cv2.IMREAD_UNCHANGED)
         if imageMat is None:
             raise Exception("Failed to read image")
         transformed = cv2.filter2D(imageMat, -1, self.matrix)
         _ = cv2.imwrite(str(conv1Path), transformed)
-
-    @override
-    def getImage(self, projectRoot: Path, fileName: str):
-        if self.needsRerun(projectRoot, fileName):
-            self.run(projectRoot, fileName)
-        path = projectRoot / "conv1" / fileName
-        return Image.open(path).convert("RGB")
-
-    @override
-    def getBytes(self, projectRoot: Path, fileName: str):
-        if self.needsRerun(projectRoot, fileName):
-            self.run(projectRoot, fileName)
-        path = projectRoot / "conv1" / fileName
-        return path.read_bytes()
