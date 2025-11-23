@@ -79,7 +79,7 @@ class UNet(nn.Module):
         final = self.final(up4)
         return final
 
-def trainUnet(datasetRoot: Path):
+def trainUNet(datasetRoot: Path):
     # Generate all the images needed for training.
     for fileName in (datasetRoot / "orig").iterdir():
         DeltaNode().run(datasetRoot, fileName.name)

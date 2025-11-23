@@ -6,7 +6,10 @@ from typing import final, override
 
 from PIL import Image
 from torch import Tensor
-from torchvision.transforms.functional import to_tensor
+import torch
+from torchvision.transforms.functional import to_pil_image, to_tensor
+
+from model import UNet
 
 class Node:
     def __init__(self, cacheDirName: str, fileExt: str, parents: list["Node"], log: Logger | None = None):
@@ -159,3 +162,36 @@ class Conv1Node(Node):
             raise Exception("Failed to read image")
         transformed = cv2.filter2D(imageMat, -1, self.matrix)
         _ = cv2.imwrite(str(conv1Path), transformed)
+
+@final
+class UNetComputationNode(Node):
+    def __init__(self, log: Logger | None = None):
+        super().__init__("unet", ".pt", [WebpNode(log)], log)
+
+    @override
+    def needsRerun(self, projectRoot: Path, fileName: str):
+        return True
+
+    @override
+    def run(self, projectRoot: Path, fileName: str):
+        super().run(projectRoot, fileName)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        modelPath = projectRoot / "model.pt"
+        outputPath = self.getPath(projectRoot, fileName)
+        webp = self.parents[0].getTensor(projectRoot, fileName)
+        model = UNet().to(device)
+        _ = model.load_state_dict(torch.load(modelPath, map_location=torch.device(device)))
+        newImgTensor = model(webp)
+        torch.save(newImgTensor, outputPath)
+        
+@final
+class UNetVisualizationNode(Node):
+    def __init__(self, log: Logger | None = None):
+        super().__init__("unet_vis", ".png", [UNetComputationNode(log)], log)
+        
+    @override
+    def run(self, projectRoot: Path, fileName: str):
+        super().run(projectRoot, fileName)
+        outputPath = self.getPath(projectRoot, fileName)
+        pilImg = to_pil_image(self.parents[0].getTensor(projectRoot, fileName))
+        pilImg.save(outputPath)

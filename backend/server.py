@@ -3,7 +3,7 @@ from pathlib import Path
 from flask import Flask, Request, request, jsonify
 from flask_cors import CORS
 
-from graph import FinalNode, MaskNode, PngNode, WebpNode, Conv1Node
+from graph import FinalNode, MaskNode, PngNode, UNetVisualizationNode, WebpNode, Conv1Node
 
 flaskServer = Flask(__name__)
 _ = CORS(flaskServer)
@@ -116,8 +116,23 @@ def requestGetConv1():
         "fileName": "filename.png"
     }
     Returns the contents of the file at
-    '/path/to/root/dir/final/filename.png'.
+    '/path/to/root/dir/conv1/filename.png'.
     """
     root, fileName = getProjectParts(request)
     matrix = np.array(request.get_json()["matrixValues"])
     return Conv1Node(matrix).getBytes(root, fileName)
+
+@flaskServer.route("/get-image-unet", methods=["POST"])
+def requestGetUnet():
+    """
+    Receives a JSON payload of the form:
+    {
+        "projectRoot": "/path/to/root/dir",
+        "fileName": "filename.png"
+    }
+    Returns the contents of the file at
+    '/path/to/root/dir/unet/filename.png'.
+    """
+    root, fileName = getProjectParts(request)
+    return UNetVisualizationNode().getBytes(root, fileName)
+
