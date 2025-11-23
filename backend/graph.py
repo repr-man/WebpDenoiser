@@ -106,6 +106,7 @@ class DeltaNode(Node):
         pngArr = np.array(png, dtype=np.int16)
         webpArr = np.array(webp, dtype=np.int16)
         delta = pngArr - webpArr
+        delta = delta.reshape(png.size[0], png.size[1], 3)
         delta.tofile(projectRoot / "delta" / fileName.replace(".png", ".bin"))
             
     @override
