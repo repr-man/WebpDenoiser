@@ -37,7 +37,7 @@ python -m venv .
 # On Posix:
 source .venv/bin/activate
 
-pip install flask flask_cors numpy pillow typer requests huggingface_hub opencv-python
+pip install flask flask_cors numpy pillow typer requests huggingface_hub opencv-python torch
 python main.py dataset
 # Then follow the prompts.
 ```
