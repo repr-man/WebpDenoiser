@@ -1,16 +1,9 @@
-from typing import final, override
 from huggingface_hub import snapshot_download
-import numpy as np
 from pathlib import Path
 import requests
 import zipfile
 from os import rename, remove
 import shutil
-from torch import Tensor
-from torch.utils.data import Dataset
-from torchvision.io.image import decode_image
-
-from graph import DeltaNode, WebpNode
 from tqdm import tqdm
 
 def loadDataset_GooglePng(root: Path):
@@ -102,31 +95,3 @@ def loadDataset_CID22(root: Path):
     remove(tmpzip)
     remove(orig / "LICENSE")
     shutil.rmtree(orig / "CID22")
-
-@final
-class OurDataset(Dataset[tuple[Tensor, Tensor]]):
-    def __init__(self, root: Path):
-        super().__init__()
-        self.root = root
-        orig = root / "orig"
-        webp = root / "webp"
-        delta = root / "delta"
-        if (
-            not orig.exists()
-            or not webp.exists()
-            or not delta.exists()
-            or next(orig.iterdir(), None) is None
-            or next(webp.iterdir(), None) is None
-            or next(delta.iterdir(), None) is None
-        ):
-            assert False, "CID22 dataset not downloaded."
-        self.filenames = [f.name for f in (root / "orig").iterdir()]
-
-    @override
-    def __getitem__(self, index: int):
-        webp = WebpNode().getTensor(self.root, self.filenames[index])
-        delta = DeltaNode().getTensor(self.root, self.filenames[index])
-        return webp, delta
-
-    def __len__(self):
-        return len(self.filenames)

@@ -4,10 +4,7 @@ import torch
 from torch import Tensor, nn
 from tqdm import tqdm
 
-from torch.utils.data import DataLoader, random_split
-
-from dataset import OurDataset
-from graph import DeltaNode
+from torch.utils.data import DataLoader, Dataset, random_split
 
 @final
 class DoubleConv(nn.Module):
@@ -79,7 +76,53 @@ class UNet(nn.Module):
         final = self.final(up4)
         return final
 
-def trainUNet(datasetRoot: Path):
+
+@final
+class OurDataset(Dataset[tuple[Tensor, Tensor]]):
+    def __init__(self, root: Path):
+        super().__init__()
+        self.root = root
+        orig = root / "orig"
+        webp = root / "webp"
+        delta = root / "delta"
+        if (
+            not orig.exists()
+            or not webp.exists()
+            or not delta.exists()
+            #or next(orig.iterdir(), None) is None
+            #or next(webp.iterdir(), None) is None
+            #or next(delta.iterdir(), None) is None
+        ):
+            assert False, "CID22 dataset not downloaded."
+        self.filenames = [f.name for f in (root / "orig").iterdir()]
+
+    @override
+    def __getitem__(self, index: int):
+        webp = WebpNode().getTensor(self.root, self.filenames[index])
+
+        png = PngNode().getTensor(self.root, self.filenames[index])
+        return webp, png
+
+        #delta = DeltaNode().getTensor(self.root, self.filenames[index])
+        #return webp, delta
+
+    def __len__(self):
+        return len(self.filenames)
+
+
+class PixelwiseMSE(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    @override
+    def forward(self, x: Tensor, y: Tensor) -> Tensor:
+        """
+        The layout of the tensors is:
+        [channel, height, width]
+        """
+        return torch.mean(torch.mean((x.squeeze(0) - y.squeeze(0)) ** 2, dim=0))
+
+
     # Generate all the images needed for training.
     for fileName in (datasetRoot / "orig").iterdir():
         DeltaNode().run(datasetRoot, fileName.name)
