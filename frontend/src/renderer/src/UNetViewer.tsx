@@ -3,14 +3,10 @@ import Carousel from './Carousel'
 import { state, getImage, ImageType } from './unetModel';
 import { Zoomer } from './Zoomer';
 
-const SubtractionViewer: Component = () => {
+const UNetViewer: Component = () => {
   const [webpImg] = createResource(
     () => state.selectedImageFileName,
     (path) => getImage(path, ImageType.Webp, state)
-  );
-  const [reconstructedImg] = createResource(
-    () => state.selectedImageFileName,
-    (path) => getImage(path, ImageType.Reconstructed, state)
   );
   const [maskImg] = createResource(
     () => state.selectedImageFileName,
@@ -19,6 +15,10 @@ const SubtractionViewer: Component = () => {
   const [unetImg] = createResource(
     () => state.selectedImageFileName,
     (path) => getImage(path, ImageType.UNet, state)
+  );
+  const [unetErrImg] = createResource(
+    () => state.selectedImageFileName,
+    (path) => getImage(path, ImageType.UNetErr, state)
   );
 
   return (
@@ -45,12 +45,14 @@ const SubtractionViewer: Component = () => {
         onMouseLeave={() => { state.isHovered = false; }}
       >
         <Zoomer state={state} blobSrc={webpImg() ?? ""} />
-        <Zoomer state={state} blobSrc={reconstructedImg() ?? ""} />
         <Zoomer state={state} blobSrc={maskImg() ?? ""} />
         <Zoomer state={state} blobSrc={unetImg() ?? ""} />
+        <Zoomer state={state} blobSrc={unetErrImg() ?? ""} />
       </div>
     </div>
   )
 }
 
-export default SubtractionViewer;
+export default UNetViewer;
+
+        //<Zoomer state={state} blobSrc={reconstructedImg() ?? ""} />

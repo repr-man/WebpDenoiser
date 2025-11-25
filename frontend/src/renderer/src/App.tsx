@@ -23,8 +23,8 @@ const App: Component = () => {
         onClick={() => {
           setScreen(props.screen);
         }}
-        >
-        </button>
+      >
+      </button>
     )
   }
 
