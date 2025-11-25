@@ -11,6 +11,7 @@ from torch.utils.data import Dataset
 from torchvision.io.image import decode_image
 
 from graph import DeltaNode, WebpNode
+from tqdm import tqdm
 
 def loadDataset_GooglePng(root: Path):
     orig = root / "orig"
@@ -91,12 +92,12 @@ def loadDataset_CID22(root: Path):
             "https://cloudinary-marketing-res.cloudinary.com/raw/upload/v1682032119/CID22.zip",
             stream=True,
         )
-        for chunk in res.iter_content(chunk_size=1024):
+        for chunk in tqdm(res.iter_content(chunk_size=1024)):
             _ = f.write(chunk)
     with zipfile.ZipFile(tmpzip, "r") as zipObj:
         print("Extracting CID22 dataset...")
         zipObj.extractall(path=orig)
-    for file in (orig / "CID22" / "original").iterdir():
+    for file in tqdm((orig / "CID22" / "original").iterdir()):
         rename(file, orig / file.name)
     remove(tmpzip)
     remove(orig / "LICENSE")
