@@ -12,9 +12,9 @@ class DoubleConv(nn.Module):
         super().__init__()
         self.op = nn.Sequential(
             nn.Conv2d(inChannels, outChannels, 3, padding=1),
-            nn.ReLU(inplace=True),
+            nn.ELU(inplace=True),
             nn.Conv2d(outChannels, outChannels, 3, padding=1),
-            nn.ReLU(inplace=True)
+            nn.ELU(inplace=True)
         )
 
     @override
@@ -36,7 +36,7 @@ class DownSample(nn.Module):
         
 @final
 class UpSample(nn.Module):
-    def __init__(self, inChannels: int, outChannels: int):
+    def __init__(self, inChannels: int, outChannels: int, skipChannels: int):
         super().__init__()
         self.transposed = nn.ConvTranspose2d(inChannels, outChannels, 2, 2)
         self.op = DoubleConv(inChannels, outChannels)
@@ -44,6 +44,8 @@ class UpSample(nn.Module):
     @override
     def forward(self, x1, x2):
         x1 = self.transposed(x1)
+        if x1.shape != x2.shape:
+             x1 = torch.nn.functional.interpolate(x1, size=x2.shape[2:], mode='bilinear', align_corners=True)
         x1 = torch.cat([x1, x2], 1)
         return self.op(x1)
 
@@ -123,9 +125,13 @@ class PixelwiseMSE(nn.Module):
         return torch.mean(torch.mean((x.squeeze(0) - y.squeeze(0)) ** 2, dim=0))
 
 
+from graph import DeltaNode, PngNode, WebpNode
+
+def trainUNet(datasetRoot: Path, usePixelwiseMSE: bool = True):
     # Generate all the images needed for training.
     for fileName in (datasetRoot / "orig").iterdir():
-        DeltaNode().run(datasetRoot, fileName.name)
+        #DeltaNode().run(datasetRoot, fileName.name)
+        PngNode().run(datasetRoot, fileName.name)
 
     dataset = OurDataset(datasetRoot)
     gen = torch.Generator().manual_seed(42)
@@ -135,19 +141,26 @@ class PixelwiseMSE(nn.Module):
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = UNet().to(device)
-    criterion = nn.MSELoss()
+    model = torch.compile(model, fullgraph=True)
+    criterion = PixelwiseMSE() if usePixelwiseMSE else nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)
 
-    EPOCHS = 2
+    EPOCHS = 5
     for epoch in tqdm(range(EPOCHS)):
         _ = model.train()
         trainRunningLoss = 0
         for img in tqdm(trainLoader):
             webp: Tensor = img[0].float().to(device)
-            delta: Tensor = img[1].float().to(device)
+            
+            #delta: Tensor = img[1].float().to(device)
+            png: Tensor = img[1].float().to(device)
+            
             prediction = model(webp)
             optimizer.zero_grad()
-            loss = criterion(prediction, delta)
+
+            #loss = criterion(prediction, delta)
+            loss = criterion(prediction, png)
+
             trainRunningLoss += loss.item()
             loss.backward()
             optimizer.step()
@@ -158,9 +171,15 @@ class PixelwiseMSE(nn.Module):
         with torch.no_grad():
             for img in tqdm(valiLoader):
                 webp: Tensor = img[0].float().to(device)
-                delta: Tensor = img[1].float().to(device)
+
+                #delta: Tensor = img[1].float().to(device)
+                png: Tensor = img[1].float().to(device)
+
                 prediction = model(webp)
-                loss = criterion(prediction, delta)
+
+                #loss = criterion(prediction, delta)
+                loss = criterion(prediction, png)
+
                 valiRunningLoss += loss.item()
             valiLoss = valiRunningLoss / (len(valiLoader) + 1)
         print(f"\nEpoch {epoch + 1} || loss: {trainLoss:.4f} :: validation loss: {valiLoss:.4f}\n")

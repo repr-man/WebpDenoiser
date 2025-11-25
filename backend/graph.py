@@ -9,8 +9,6 @@ from torch import Tensor
 import torch
 from torchvision.transforms.functional import to_pil_image, to_tensor
 
-from model import UNet
-
 class Node:
     def __init__(self, cacheDirName: str, fileExt: str, parents: list["Node"], log: Logger | None = None):
         self.parents: list[Node] = parents
@@ -163,14 +161,13 @@ class Conv1Node(Node):
         transformed = cv2.filter2D(imageMat, -1, self.matrix)
         _ = cv2.imwrite(str(conv1Path), transformed)
 
+# This needs to be here to avoid circular imports.
+from model import UNet
+
 @final
 class UNetComputationNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("unet", ".pt", [WebpNode(log)], log)
-
-    @override
-    def needsRerun(self, projectRoot: Path, fileName: str):
-        return True
+        super().__init__("unet", ".png", [WebpNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
@@ -180,34 +177,36 @@ class UNetComputationNode(Node):
         outputPath = self.getPath(projectRoot, fileName)
         webp = self.parents[0].getTensor(projectRoot, fileName)
         model = UNet().to(device)
-        _ = model.load_state_dict(torch.load(modelPath, map_location=torch.device(device)))
-        newImgTensor = model(webp)
-        torch.save(newImgTensor, outputPath)
-        
-@final
-class UNetVisualizationNode(Node):
-    def __init__(self, log: Logger | None = None):
-        super().__init__("unet_vis", ".png", [UNetComputationNode(log)], log)
-        
-    @override
-    def run(self, projectRoot: Path, fileName: str):
-        super().run(projectRoot, fileName)
-        outputPath = self.getPath(projectRoot, fileName)
-        tensor = self.parents[0].getTensor(projectRoot, fileName)
-        tensor += 128
-        pilImg = to_pil_image(tensor)
+
+        state_dict = torch.load(modelPath, map_location=torch.device(device))
+        new_state_dict = {}
+        for k, v in state_dict.items():
+            # Remove the "_orig_mod." prefix
+            new_key = k.replace("_orig_mod.", "")
+            new_state_dict[new_key] = v
+
+        _ = model.load_state_dict(new_state_dict)
+        #_ = model.load_state_dict(torch.load(modelPath, map_location=torch.device(device)))
+        webp = webp.unsqueeze(0)
+        newImgTensor = model(webp).squeeze(0)
+        pilImg = to_pil_image(newImgTensor)
         pilImg.save(outputPath, format="png")
 
+
 @final
-class ReconstructedNode(Node):
+class UNetErrorNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("reconstructed", ".png", [UNetComputationNode(log)], log)
+        super().__init__("unet_err", ".png", [PngNode(log), UNetComputationNode(log)], log)
+        super().__init__("unet_err", ".png", [WebpNode(log), UNetComputationNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
         super().run(projectRoot, fileName)
         outputPath = self.getPath(projectRoot, fileName)
-        tensor = self.parents[0].getTensor(projectRoot, fileName)
-        tensor += 128
-        pilImg = to_pil_image(tensor)
+        unet = self.parents[1].getTensor(projectRoot, fileName)
+        png = self.parents[0].getTensor(projectRoot, fileName)
+        result = unet - png
+        #webp = self.parents[0].getTensor(projectRoot, fileName)
+        #result = (unet - webp)
+        pilImg = to_pil_image(result)
         pilImg.save(outputPath, format="png")
