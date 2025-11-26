@@ -162,12 +162,12 @@ class Conv1Node(Node):
         _ = cv2.imwrite(str(conv1Path), transformed)
 
 # This needs to be here to avoid circular imports.
-from model import UNet
+from model import ResNet
 
 @final
-class UNetComputationNode(Node):
+class ResNetComputationNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("unet", ".png", [WebpNode(log)], log)
+        super().__init__("resnet", ".png", [WebpNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
@@ -176,7 +176,7 @@ class UNetComputationNode(Node):
         modelPath = projectRoot / "model.pt"
         outputPath = self.getPath(projectRoot, fileName)
         webp = self.parents[0].getTensor(projectRoot, fileName)
-        model = UNet().to(device)
+        model = ResNet().to(device)
 
         state_dict = torch.load(modelPath, map_location=torch.device(device))
         new_state_dict = {}
@@ -186,7 +186,6 @@ class UNetComputationNode(Node):
             new_state_dict[new_key] = v
 
         _ = model.load_state_dict(new_state_dict)
-        #_ = model.load_state_dict(torch.load(modelPath, map_location=torch.device(device)))
         webp = webp.unsqueeze(0)
         newImgTensor = model(webp).squeeze(0)
         pilImg = to_pil_image(newImgTensor)
@@ -194,19 +193,17 @@ class UNetComputationNode(Node):
 
 
 @final
-class UNetErrorNode(Node):
+class ResNetErrorNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("unet_err", ".png", [PngNode(log), UNetComputationNode(log)], log)
-        super().__init__("unet_err", ".png", [WebpNode(log), UNetComputationNode(log)], log)
+        super().__init__("resnet_err", ".png", [PngNode(log), ResNetComputationNode(log)], log)
+        super().__init__("resnet_err", ".png", [WebpNode(log), ResNetComputationNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
         super().run(projectRoot, fileName)
         outputPath = self.getPath(projectRoot, fileName)
-        unet = self.parents[1].getTensor(projectRoot, fileName)
+        resnet = self.parents[1].getTensor(projectRoot, fileName)
         png = self.parents[0].getTensor(projectRoot, fileName)
-        result = unet - png
-        #webp = self.parents[0].getTensor(projectRoot, fileName)
-        #result = (unet - webp)
+        result = resnet - png
         pilImg = to_pil_image(result)
         pilImg.save(outputPath, format="png")

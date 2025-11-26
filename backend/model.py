@@ -7,76 +7,88 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset, random_split
 
 @final
-class DoubleConv(nn.Module):
-    def __init__(self, inChannels: int, outChannels: int):
+class ResBlock(nn.Module):
+    def __init__(self, inChannels: int, outChannels: int, stride: int = 1):
         super().__init__()
-        self.op = nn.Sequential(
-            nn.Conv2d(inChannels, outChannels, 3, padding=1),
-            nn.ELU(inplace=True),
-            nn.Conv2d(outChannels, outChannels, 3, padding=1),
-            nn.ELU(inplace=True)
-        )
+        self.conv1 = nn.Conv2d(inChannels, outChannels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(outChannels)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(outChannels, outChannels, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(outChannels)
+        
+        self.downsample = None
+        if stride != 1 or inChannels != outChannels:
+            self.downsample = nn.Sequential(
+                nn.Conv2d(inChannels, outChannels, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(outChannels)
+            )
 
     @override
     def forward(self, x):
-        return self.op(x)
-
-@final
-class DownSample(nn.Module):
-    def __init__(self, inChannels: int, outChannels: int):
-        super().__init__()
-        self.op = DoubleConv(inChannels, outChannels)
-        self.pool = nn.MaxPool2d(2, 2)
+        identity = x
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+        out = self.conv2(out)
+        out = self.bn2(out)
         
-    @override
-    def forward(self, x):
-        downSampled = self.op(x)
-        pooled = self.pool(downSampled)
-        return downSampled, pooled
-        
-@final
-class UpSample(nn.Module):
-    def __init__(self, inChannels: int, outChannels: int, skipChannels: int):
-        super().__init__()
-        self.transposed = nn.ConvTranspose2d(inChannels, outChannels, 2, 2)
-        self.op = DoubleConv(inChannels, outChannels)
-
-    @override
-    def forward(self, x1, x2):
-        x1 = self.transposed(x1)
-        if x1.shape != x2.shape:
-             x1 = torch.nn.functional.interpolate(x1, size=x2.shape[2:], mode='bilinear', align_corners=True)
-        x1 = torch.cat([x1, x2], 1)
-        return self.op(x1)
+        if self.downsample is not None:
+            identity = self.downsample(x)
+            
+        out += identity
+        out = self.relu(out)
+        return out
 
 @final
-class UNet(nn.Module):
+class ResNet(nn.Module):
     def __init__(self):
         super().__init__()
-        self.down1 = DownSample(3, 64)
-        self.down2 = DownSample(64, 128)
-        self.down3 = DownSample(128, 256)
-        self.down4 = DownSample(256, 512)
-        self.bottleneck = DoubleConv(512, 1024)
-        self.up1 = UpSample(1024, 512)
-        self.up2 = UpSample(512, 256)
-        self.up3 = UpSample(256, 128)
-        self.up4 = UpSample(128, 64)
-        self.final = nn.Conv2d(64, 3, 1)
+        self.inChannels = 64
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        
+        self.layer1 = self._make_layer(64, 2, stride=1)
+        self.layer2 = self._make_layer(128, 2, stride=2)
+        self.layer3 = self._make_layer(256, 2, stride=2)
+        self.layer4 = self._make_layer(512, 2, stride=2)
+        
+        self.up1 = nn.ConvTranspose2d(512, 256, 2, stride=2)
+        self.up2 = nn.ConvTranspose2d(256, 128, 2, stride=2)
+        self.up3 = nn.ConvTranspose2d(128, 64, 2, stride=2)
+        self.up4 = nn.ConvTranspose2d(64, 64, 2, stride=2)
+        self.up5 = nn.ConvTranspose2d(64, 3, 2, stride=2)
+        self.final = nn.Conv2d(3, 3, kernel_size=1)
+
+    def _make_layer(self, outChannels: int, blocks: int, stride: int = 1):
+        layers = []
+        layers.append(ResBlock(self.inChannels, outChannels, stride))
+        self.inChannels = outChannels
+        for _ in range(1, blocks):
+            layers.append(ResBlock(outChannels, outChannels))
+        return nn.Sequential(*layers)
 
     @override
     def forward(self, x):
-        down1, pool1 = self.down1(x)
-        down2, pool2 = self.down2(pool1)
-        down3, pool3 = self.down3(pool2)
-        down4, pool4 = self.down4(pool3)
-        bottleneck = self.bottleneck(pool4)
-        up1 = self.up1(bottleneck, down4)
-        up2 = self.up2(up1, down3)
-        up3 = self.up3(up2, down2)
-        up4 = self.up4(up3, down1)
-        final = self.final(up4)
-        return final
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        
+        x = self.up1(x)
+        x = self.up2(x)
+        x = self.up3(x)
+        x = self.up4(x)
+        x = self.up5(x)
+        
+        x = self.final(x)
+        return x
 
 
 @final
@@ -91,9 +103,6 @@ class OurDataset(Dataset[tuple[Tensor, Tensor]]):
             not orig.exists()
             or not webp.exists()
             or not delta.exists()
-            #or next(orig.iterdir(), None) is None
-            #or next(webp.iterdir(), None) is None
-            #or next(delta.iterdir(), None) is None
         ):
             assert False, "CID22 dataset not downloaded."
         self.filenames = [f.name for f in (root / "orig").iterdir()]
@@ -101,12 +110,8 @@ class OurDataset(Dataset[tuple[Tensor, Tensor]]):
     @override
     def __getitem__(self, index: int):
         webp = WebpNode().getTensor(self.root, self.filenames[index])
-
         png = PngNode().getTensor(self.root, self.filenames[index])
         return webp, png
-
-        #delta = DeltaNode().getTensor(self.root, self.filenames[index])
-        #return webp, delta
 
     def __len__(self):
         return len(self.filenames)
@@ -127,10 +132,9 @@ class PixelwiseMSE(nn.Module):
 
 from graph import DeltaNode, PngNode, WebpNode
 
-def trainUNet(datasetRoot: Path, usePixelwiseMSE: bool = True):
+def trainResNet(datasetRoot: Path, usePixelwiseMSE: bool = True):
     # Generate all the images needed for training.
     for fileName in (datasetRoot / "orig").iterdir():
-        #DeltaNode().run(datasetRoot, fileName.name)
         PngNode().run(datasetRoot, fileName.name)
 
     dataset = OurDataset(datasetRoot)
@@ -140,7 +144,7 @@ def trainUNet(datasetRoot: Path, usePixelwiseMSE: bool = True):
     valiLoader = DataLoader(valiData, shuffle=True)
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = UNet().to(device)
+    model = ResNet().to(device)
     model = torch.compile(model, fullgraph=True)
     criterion = PixelwiseMSE() if usePixelwiseMSE else nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)
@@ -151,16 +155,10 @@ def trainUNet(datasetRoot: Path, usePixelwiseMSE: bool = True):
         trainRunningLoss = 0
         for img in tqdm(trainLoader):
             webp: Tensor = img[0].float().to(device)
-            
-            #delta: Tensor = img[1].float().to(device)
             png: Tensor = img[1].float().to(device)
-            
             prediction = model(webp)
             optimizer.zero_grad()
-
-            #loss = criterion(prediction, delta)
             loss = criterion(prediction, png)
-
             trainRunningLoss += loss.item()
             loss.backward()
             optimizer.step()
@@ -171,15 +169,9 @@ def trainUNet(datasetRoot: Path, usePixelwiseMSE: bool = True):
         with torch.no_grad():
             for img in tqdm(valiLoader):
                 webp: Tensor = img[0].float().to(device)
-
-                #delta: Tensor = img[1].float().to(device)
                 png: Tensor = img[1].float().to(device)
-
                 prediction = model(webp)
-
-                #loss = criterion(prediction, delta)
                 loss = criterion(prediction, png)
-
                 valiRunningLoss += loss.item()
             valiLoss = valiRunningLoss / (len(valiLoader) + 1)
         print(f"\nEpoch {epoch + 1} || loss: {trainLoss:.4f} :: validation loss: {valiLoss:.4f}\n")

@@ -3,8 +3,7 @@ from pathlib import Path
 from flask import Flask, Request, request, jsonify
 from flask_cors import CORS
 
-#from graph import FinalNode, MaskNode, PngNode, ReconstructedNode, UNetComputationNode, UNetVisualizationNode, WebpNode, Conv1Node
-from graph import FinalNode, MaskNode, PngNode, UNetComputationNode, UNetErrorNode, WebpNode, Conv1Node
+from graph import FinalNode, MaskNode, PngNode, ResNetComputationNode, ResNetErrorNode, WebpNode, Conv1Node
 
 flaskServer = Flask(__name__)
 _ = CORS(flaskServer)
@@ -123,8 +122,8 @@ def requestGetConv1():
     matrix = np.array(request.get_json()["matrixValues"])
     return Conv1Node(matrix).getBytes(root, fileName)
 
-@flaskServer.route("/get-image-unet", methods=["POST"])
-def requestGetUnet():
+@flaskServer.route("/get-image-resnet", methods=["POST"])
+def requestGetResNet():
     """
     Receives a JSON payload of the form:
     {
@@ -132,13 +131,13 @@ def requestGetUnet():
         "fileName": "filename.png"
     }
     Returns the contents of the file at
-    '/path/to/root/dir/unet/filename.png'.
+    '/path/to/root/dir/resnet/filename.png'.
     """
     root, fileName = getProjectParts(request)
-    return UNetComputationNode().getBytes(root, fileName)
+    return ResNetComputationNode().getBytes(root, fileName)
 
-@flaskServer.route("/get-image-unet_err", methods=["POST"])
-def requestGetUnetErr():
+@flaskServer.route("/get-image-resnet_err", methods=["POST"])
+def requestGetResNetErr():
     """
     Receives a JSON payload of the form:
     {
@@ -146,7 +145,7 @@ def requestGetUnetErr():
         "fileName": "filename.png"
     }
     Returns the contents of the file at
-    '/path/to/root/dir/unet_err/filename.png'.
+    '/path/to/root/dir/resnet_err/filename.png'.
     """
     root, fileName = getProjectParts(request)
-    return UNetErrorNode().getBytes(root, fileName)
+    return ResNetErrorNode().getBytes(root, fileName)
