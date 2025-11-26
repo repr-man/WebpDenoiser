@@ -3,7 +3,7 @@ from pathlib import Path
 from flask import Flask, Request, request, jsonify
 from flask_cors import CORS
 
-from graph import FinalNode, MaskNode, PngNode, ResNetComputationNode, ResNetErrorNode, WebpNode, Conv1Node
+from graph import FinalNode, MaskNode, PngNode, RBDNComputationNode, RBDNErrorNode, WebpNode, Conv1Node
 
 flaskServer = Flask(__name__)
 _ = CORS(flaskServer)
@@ -122,8 +122,8 @@ def requestGetConv1():
     matrix = np.array(request.get_json()["matrixValues"])
     return Conv1Node(matrix).getBytes(root, fileName)
 
-@flaskServer.route("/get-image-resnet", methods=["POST"])
-def requestGetResNet():
+@flaskServer.route("/get-image-rbdn", methods=["POST"])
+def requestGetRBDN():
     """
     Receives a JSON payload of the form:
     {
@@ -131,13 +131,13 @@ def requestGetResNet():
         "fileName": "filename.png"
     }
     Returns the contents of the file at
-    '/path/to/root/dir/resnet/filename.png'.
+    '/path/to/root/dir/rbdn/filename.png'.
     """
     root, fileName = getProjectParts(request)
-    return ResNetComputationNode().getBytes(root, fileName)
+    return RBDNComputationNode().getBytes(root, fileName)
 
-@flaskServer.route("/get-image-resnet_err", methods=["POST"])
-def requestGetResNetErr():
+@flaskServer.route("/get-image-rbdn_err", methods=["POST"])
+def requestGetRBDNErr():
     """
     Receives a JSON payload of the form:
     {
@@ -145,7 +145,7 @@ def requestGetResNetErr():
         "fileName": "filename.png"
     }
     Returns the contents of the file at
-    '/path/to/root/dir/resnet_err/filename.png'.
+    '/path/to/root/dir/rbdn_err/filename.png'.
     """
     root, fileName = getProjectParts(request)
-    return ResNetErrorNode().getBytes(root, fileName)
+    return RBDNErrorNode().getBytes(root, fileName)

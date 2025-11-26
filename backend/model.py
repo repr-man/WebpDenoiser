@@ -7,88 +7,63 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset, random_split
 
 @final
-class ResBlock(nn.Module):
-    def __init__(self, inChannels: int, outChannels: int, stride: int = 1):
+class ProjectionUnit(nn.Module):
+    def __init__(self, inChannels: int, outChannels: int):
         super().__init__()
-        self.conv1 = nn.Conv2d(inChannels, outChannels, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(outChannels)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(outChannels, outChannels, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(outChannels)
-        
-        self.downsample = None
-        if stride != 1 or inChannels != outChannels:
-            self.downsample = nn.Sequential(
-                nn.Conv2d(inChannels, outChannels, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(outChannels)
-            )
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(inChannels, outChannels, kernel_size=3, padding=1),
+            nn.PReLU()
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(outChannels, inChannels, kernel_size=3, padding=1),
+            nn.PReLU()
+        )
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(inChannels, outChannels, kernel_size=3, padding=1),
+            nn.PReLU()
+        )
 
     @override
     def forward(self, x):
-        identity = x
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-        out = self.conv2(out)
-        out = self.bn2(out)
-        
-        if self.downsample is not None:
-            identity = self.downsample(x)
-            
-        out += identity
-        out = self.relu(out)
-        return out
+        h0 = self.conv1(x)
+        l0 = self.conv2(h0)
+        e = x - l0
+        h1 = h0 + self.conv3(e)
+        return h1
 
 @final
-class ResNet(nn.Module):
-    def __init__(self):
+class RBDN(nn.Module):
+    def __init__(self, inChannels: int = 3, outChannels: int = 3, feat: int = 64, numStages: int = 4):
         super().__init__()
-        self.inChannels = 64
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        self.bn1 = nn.BatchNorm2d(64)
-        self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.feat0 = nn.Conv2d(inChannels, feat, kernel_size=3, padding=1)
+        self.feat1 = nn.Conv2d(feat, feat, kernel_size=1, padding=0)
         
-        self.layer1 = self._make_layer(64, 2, stride=1)
-        self.layer2 = self._make_layer(128, 2, stride=2)
-        self.layer3 = self._make_layer(256, 2, stride=2)
-        self.layer4 = self._make_layer(512, 2, stride=2)
+        self.stages = nn.ModuleList()
+        for _ in range(numStages):
+            self.stages.append(ProjectionUnit(feat, feat))
+            
+        self.bottleneck = nn.Conv2d(feat * numStages, feat, kernel_size=1, padding=0)
+        self.output = nn.Conv2d(feat, outChannels, kernel_size=3, padding=1)
         
-        self.up1 = nn.ConvTranspose2d(512, 256, 2, stride=2)
-        self.up2 = nn.ConvTranspose2d(256, 128, 2, stride=2)
-        self.up3 = nn.ConvTranspose2d(128, 64, 2, stride=2)
-        self.up4 = nn.ConvTranspose2d(64, 64, 2, stride=2)
-        self.up5 = nn.ConvTranspose2d(64, 3, 2, stride=2)
-        self.final = nn.Conv2d(3, 3, kernel_size=1)
-
-    def _make_layer(self, outChannels: int, blocks: int, stride: int = 1):
-        layers = []
-        layers.append(ResBlock(self.inChannels, outChannels, stride))
-        self.inChannels = outChannels
-        for _ in range(1, blocks):
-            layers.append(ResBlock(outChannels, outChannels))
-        return nn.Sequential(*layers)
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
 
     @override
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        f0 = self.feat0(x)
+        f = self.feat1(f0)
         
-        x = self.up1(x)
-        x = self.up2(x)
-        x = self.up3(x)
-        x = self.up4(x)
-        x = self.up5(x)
+        res = []
+        for stage in self.stages:
+            f = stage(f)
+            res.append(f)
+            
+        out = torch.cat(res, dim=1)
+        out = self.bottleneck(out)
+        out = self.output(out)
         
-        x = self.final(x)
-        return x
+        return out + x
 
 
 @final
@@ -132,7 +107,7 @@ class PixelwiseMSE(nn.Module):
 
 from graph import DeltaNode, PngNode, WebpNode
 
-def trainResNet(datasetRoot: Path, usePixelwiseMSE: bool = True):
+def trainRBDN(datasetRoot: Path, usePixelwiseMSE: bool = True):
     # Generate all the images needed for training.
     for fileName in (datasetRoot / "orig").iterdir():
         PngNode().run(datasetRoot, fileName.name)
@@ -144,7 +119,7 @@ def trainResNet(datasetRoot: Path, usePixelwiseMSE: bool = True):
     valiLoader = DataLoader(valiData, shuffle=True)
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = ResNet().to(device)
+    model = RBDN().to(device)
     model = torch.compile(model, fullgraph=True)
     criterion = PixelwiseMSE() if usePixelwiseMSE else nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)

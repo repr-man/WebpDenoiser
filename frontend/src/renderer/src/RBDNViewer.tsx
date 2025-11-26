@@ -1,9 +1,9 @@
 import { Component, createResource } from 'solid-js'
 import Carousel from './Carousel'
-import { state, getImage, ImageType } from './unetModel';
+import { state, getImage, ImageType } from './rbdnModel';
 import { Zoomer } from './Zoomer';
 
-const UNetViewer: Component = () => {
+const RBDNViewer: Component = () => {
   const [webpImg] = createResource(
     () => state.selectedImageFileName,
     (path) => getImage(path, ImageType.Webp, state)
@@ -12,13 +12,13 @@ const UNetViewer: Component = () => {
     () => state.selectedImageFileName,
     (path) => getImage(path, ImageType.Mask, state)
   );
-  const [unetImg] = createResource(
+  const [rbdnImg] = createResource(
     () => state.selectedImageFileName,
-    (path) => getImage(path, ImageType.UNet, state)
+    (path) => getImage(path, ImageType.RBDN, state)
   );
-  const [unetErrImg] = createResource(
+  const [rbdnErrImg] = createResource(
     () => state.selectedImageFileName,
-    (path) => getImage(path, ImageType.UNetErr, state)
+    (path) => getImage(path, ImageType.RBDNErr, state)
   );
 
   return (
@@ -46,13 +46,13 @@ const UNetViewer: Component = () => {
       >
         <Zoomer state={state} blobSrc={webpImg() ?? ""} />
         <Zoomer state={state} blobSrc={maskImg() ?? ""} />
-        <Zoomer state={state} blobSrc={unetImg() ?? ""} />
-        <Zoomer state={state} blobSrc={unetErrImg() ?? ""} />
+        <Zoomer state={state} blobSrc={rbdnImg() ?? ""} />
+        <Zoomer state={state} blobSrc={rbdnErrImg() ?? ""} />
       </div>
     </div>
   )
 }
 
-export default UNetViewer;
+export default RBDNViewer;
 
-        //<Zoomer state={state} blobSrc={reconstructedImg() ?? ""} />
+//<Zoomer state={state} blobSrc={reconstructedImg() ?? ""} />

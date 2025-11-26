@@ -162,12 +162,12 @@ class Conv1Node(Node):
         _ = cv2.imwrite(str(conv1Path), transformed)
 
 # This needs to be here to avoid circular imports.
-from model import ResNet
+from model import RBDN
 
 @final
-class ResNetComputationNode(Node):
+class RBDNComputationNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("resnet", ".png", [WebpNode(log)], log)
+        super().__init__("rbdn", ".png", [WebpNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
@@ -176,7 +176,7 @@ class ResNetComputationNode(Node):
         modelPath = projectRoot / "model.pt"
         outputPath = self.getPath(projectRoot, fileName)
         webp = self.parents[0].getTensor(projectRoot, fileName)
-        model = ResNet().to(device)
+        model = RBDN().to(device)
 
         state_dict = torch.load(modelPath, map_location=torch.device(device))
         new_state_dict = {}
@@ -193,17 +193,16 @@ class ResNetComputationNode(Node):
 
 
 @final
-class ResNetErrorNode(Node):
+class RBDNErrorNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("resnet_err", ".png", [PngNode(log), ResNetComputationNode(log)], log)
-        super().__init__("resnet_err", ".png", [WebpNode(log), ResNetComputationNode(log)], log)
+        super().__init__("rbdn_err", ".png", [WebpNode(log), RBDNComputationNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
         super().run(projectRoot, fileName)
         outputPath = self.getPath(projectRoot, fileName)
-        resnet = self.parents[1].getTensor(projectRoot, fileName)
+        rbdn = self.parents[1].getTensor(projectRoot, fileName)
         png = self.parents[0].getTensor(projectRoot, fileName)
-        result = resnet - png
+        result = rbdn - png
         pilImg = to_pil_image(result)
         pilImg.save(outputPath, format="png")
