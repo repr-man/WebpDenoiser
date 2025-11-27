@@ -36,7 +36,7 @@ class DownSample(nn.Module):
         
 @final
 class UpSample(nn.Module):
-    def __init__(self, inChannels: int, outChannels: int, skipChannels: int):
+    def __init__(self, inChannels: int, outChannels: int):
         super().__init__()
         self.transposed = nn.ConvTranspose2d(inChannels, outChannels, 2, 2)
         self.op = DoubleConv(inChannels, outChannels)

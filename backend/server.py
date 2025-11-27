@@ -3,8 +3,7 @@ from pathlib import Path
 from flask import Flask, Request, request, jsonify
 from flask_cors import CORS
 
-#from graph import FinalNode, MaskNode, PngNode, ReconstructedNode, UNetComputationNode, UNetVisualizationNode, WebpNode, Conv1Node
-from graph import FinalNode, MaskNode, PngNode, UNetComputationNode, UNetErrorNode, WebpNode, Conv1Node
+from graph import FinalNode, MaskNode, PngNode, UNetComputationNode, ErrorNode, WebpNode, Conv1Node
 
 flaskServer = Flask(__name__)
 _ = CORS(flaskServer)
@@ -137,8 +136,8 @@ def requestGetUnet():
     root, fileName = getProjectParts(request)
     return UNetComputationNode().getBytes(root, fileName)
 
-@flaskServer.route("/get-image-unet_err", methods=["POST"])
-def requestGetUnetErr():
+@flaskServer.route("/get-image-error", methods=["POST"])
+def requestGetError():
     """
     Receives a JSON payload of the form:
     {
@@ -146,7 +145,7 @@ def requestGetUnetErr():
         "fileName": "filename.png"
     }
     Returns the contents of the file at
-    '/path/to/root/dir/unet_err/filename.png'.
+    '/path/to/root/dir/error/filename.png'.
     """
     root, fileName = getProjectParts(request)
-    return UNetErrorNode().getBytes(root, fileName)
+    return ErrorNode(log).getBytes(root, fileName)

@@ -22,8 +22,8 @@ def dataset(datasetroot: Annotated[str | None, typer.Argument()] = None):
     (root / "mask").mkdir(parents=True, exist_ok=True)
     (root / "final").mkdir(parents=True, exist_ok=True)
     (root / "conv1").mkdir(parents=True, exist_ok=True)
+    (root / "error").mkdir(parents=True, exist_ok=True)
     (root / "unet").mkdir(parents=True, exist_ok=True)
-    (root / "unet_err").mkdir(parents=True, exist_ok=True)
 
     # Download the dataset.
     #loadDataset_GooglePng(root)
@@ -45,7 +45,7 @@ def train(datasetroot: Annotated[Path | None, typer.Argument()] = None):
 
     # TODO: Train the model.  When we get to this part, we will want to put the
     # code in a file called `train.py` or `model.py` or something like that.
-    trainUNet(root)
+    trainUNet(root, True)
 
 if __name__ == "__main__":
     app()

@@ -16,9 +16,9 @@ const UNetViewer: Component = () => {
     () => state.selectedImageFileName,
     (path) => getImage(path, ImageType.UNet, state)
   );
-  const [unetErrImg] = createResource(
+  const [ErrorImg] = createResource(
     () => state.selectedImageFileName,
-    (path) => getImage(path, ImageType.UNetErr, state)
+    (path) => getImage(path, ImageType.Error, state)
   );
 
   return (
@@ -47,7 +47,7 @@ const UNetViewer: Component = () => {
         <Zoomer state={state} blobSrc={webpImg() ?? ""} />
         <Zoomer state={state} blobSrc={maskImg() ?? ""} />
         <Zoomer state={state} blobSrc={unetImg() ?? ""} />
-        <Zoomer state={state} blobSrc={unetErrImg() ?? ""} />
+        <Zoomer state={state} blobSrc={ErrorImg() ?? ""} />
       </div>
     </div>
   )

@@ -194,19 +194,27 @@ class UNetComputationNode(Node):
 
 
 @final
-class UNetErrorNode(Node):
+class ErrorNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("unet_err", ".png", [PngNode(log), UNetComputationNode(log)], log)
-        super().__init__("unet_err", ".png", [WebpNode(log), UNetComputationNode(log)], log)
+        super().__init__("error", ".png", [WebpNode(log), UNetComputationNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
         super().run(projectRoot, fileName)
         outputPath = self.getPath(projectRoot, fileName)
         unet = self.parents[1].getTensor(projectRoot, fileName)
-        png = self.parents[0].getTensor(projectRoot, fileName)
-        result = unet - png
-        #webp = self.parents[0].getTensor(projectRoot, fileName)
-        #result = (unet - webp)
-        pilImg = to_pil_image(result)
+        webp = self.parents[0].getTensor(projectRoot, fileName)
+        for i in range(unet.shape[2]):
+            for j in range(unet.shape[1]):
+                if i == 0 and j == 0:
+                    self.log(unet[:, j, i])
+                    self.log(webp[:, j, i])
+                rSame = unet[0, j, i].item() == webp[0, j, i].item()
+                gSame = unet[1, j, i].item() == webp[1, j, i].item()
+                bSame = unet[2, j, i].item() == webp[2, j, i].item()
+                if (rSame and gSame and bSame):
+                    unet[0, j, i] = 0
+                    unet[1, j, i] = 0
+                    unet[2, j, i] = 0
+        pilImg = to_pil_image(unet)
         pilImg.save(outputPath, format="png")
