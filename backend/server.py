@@ -3,7 +3,7 @@ from pathlib import Path
 from flask import Flask, Request, request, jsonify
 from flask_cors import CORS
 
-from graph import FinalNode, MaskNode, PngNode, RBDNComputationNode, RBDNErrorNode, WebpNode, Conv1Node
+from graph import FinalNode, MaskNode, PngNode, DPWSDNetComputationNode, DPWSDNetErrorNode, WebpNode, Conv1Node
 
 flaskServer = Flask(__name__)
 _ = CORS(flaskServer)
@@ -122,8 +122,8 @@ def requestGetConv1():
     matrix = np.array(request.get_json()["matrixValues"])
     return Conv1Node(matrix).getBytes(root, fileName)
 
-@flaskServer.route("/get-image-rbdn", methods=["POST"])
-def requestGetRBDN():
+@flaskServer.route("/get-image-dpw_sdnet", methods=["POST"])
+def requestGetDPWSDNet():
     """
     Receives a JSON payload of the form:
     {
@@ -131,13 +131,13 @@ def requestGetRBDN():
         "fileName": "filename.png"
     }
     Returns the contents of the file at
-    '/path/to/root/dir/rbdn/filename.png'.
+    '/path/to/root/dir/dpwsdnet/filename.png'.
     """
     root, fileName = getProjectParts(request)
-    return RBDNComputationNode().getBytes(root, fileName)
+    return DPWSDNetComputationNode().getBytes(root, fileName)
 
-@flaskServer.route("/get-image-rbdn_err", methods=["POST"])
-def requestGetRBDNErr():
+@flaskServer.route("/get-image-dpw_sdnet_err", methods=["POST"])
+def requestGetDPWSDNetErr():
     """
     Receives a JSON payload of the form:
     {
@@ -145,7 +145,7 @@ def requestGetRBDNErr():
         "fileName": "filename.png"
     }
     Returns the contents of the file at
-    '/path/to/root/dir/rbdn_err/filename.png'.
+    '/path/to/root/dir/dpwsdnet_err/filename.png'.
     """
     root, fileName = getProjectParts(request)
-    return RBDNErrorNode().getBytes(root, fileName)
+    return DPWSDNetErrorNode().getBytes(root, fileName)

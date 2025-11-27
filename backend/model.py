@@ -7,63 +7,102 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset, random_split
 
 @final
-class ProjectionUnit(nn.Module):
-    def __init__(self, inChannels: int, outChannels: int):
+class DWT(nn.Module):
+    def __init__(self):
         super().__init__()
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(inChannels, outChannels, kernel_size=3, padding=1),
-            nn.PReLU()
-        )
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(outChannels, inChannels, kernel_size=3, padding=1),
-            nn.PReLU()
-        )
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(inChannels, outChannels, kernel_size=3, padding=1),
-            nn.PReLU()
-        )
+        self.requires_grad = False
 
     @override
-    def forward(self, x):
-        h0 = self.conv1(x)
-        l0 = self.conv2(h0)
-        e = x - l0
-        h1 = h0 + self.conv3(e)
-        return h1
+    def forward(self, x: Tensor) -> Tensor:
+        x01 = x[:, :, 0::2, :] / 2
+        x02 = x[:, :, 1::2, :] / 2
+        x1 = x01[:, :, :, 0::2]
+        x2 = x02[:, :, :, 0::2]
+        x3 = x01[:, :, :, 1::2]
+        x4 = x02[:, :, :, 1::2]
+        y1 = x1 + x2 + x3 + x4
+        y2 = x1 - x2 + x3 - x4
+        y3 = x1 + x2 - x3 - x4
+        y4 = x1 - x2 - x3 + x4
+        return torch.cat([y1, y2, y3, y4], dim=1)
 
 @final
-class RBDN(nn.Module):
+class IDWT(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.requires_grad = False
+
+    @override
+    def forward(self, x: Tensor) -> Tensor:
+        r = 2
+        in_batch, in_channel, in_height, in_width = x.size()
+        out_batch, out_channel, out_height, out_width = in_batch, int(in_channel / (r ** 2)), r * in_height, r * in_width
+        x1 = x[:, 0:out_channel, :, :] / 2
+        x2 = x[:, out_channel:out_channel * 2, :, :] / 2
+        x3 = x[:, out_channel * 2:out_channel * 3, :, :] / 2
+        x4 = x[:, out_channel * 3:out_channel * 4, :, :] / 2
+        
+        h = torch.zeros([out_batch, out_channel, out_height, out_width]).float().to(x.device)
+        
+        h[:, :, 0::2, 0::2] = x1 + x2 + x3 + x4
+        h[:, :, 1::2, 0::2] = x1 - x2 + x3 - x4
+        h[:, :, 0::2, 1::2] = x1 + x2 - x3 - x4
+        h[:, :, 1::2, 1::2] = x1 - x2 - x3 + x4
+        
+        return h
+
+class BasicBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, 3, 1, 1)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, 3, 1, 1)
+        
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.relu(out)
+        out = self.conv2(out)
+        return out + x
+
+@final
+class DPW_SDNet(nn.Module):
     def __init__(self, inChannels: int = 3, outChannels: int = 3, feat: int = 64, numStages: int = 4):
         super().__init__()
-        self.feat0 = nn.Conv2d(inChannels, feat, kernel_size=3, padding=1)
-        self.feat1 = nn.Conv2d(feat, feat, kernel_size=1, padding=0)
         
-        self.stages = nn.ModuleList()
-        for _ in range(numStages):
-            self.stages.append(ProjectionUnit(feat, feat))
-            
-        self.bottleneck = nn.Conv2d(feat * numStages, feat, kernel_size=1, padding=0)
-        self.output = nn.Conv2d(feat, outChannels, kernel_size=3, padding=1)
+        # Pixel Branch
+        self.pixel_unshuffle = nn.PixelUnshuffle(2)
+        self.pixel_head = nn.Conv2d(inChannels * 4, feat, 3, 1, 1)
+        self.pixel_body = nn.Sequential(*[BasicBlock(feat, feat) for _ in range(numStages)])
+        self.pixel_tail = nn.Conv2d(feat, outChannels * 4, 3, 1, 1)
+        self.pixel_shuffle = nn.PixelShuffle(2)
         
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+        # Wavelet Branch
+        self.dwt = DWT()
+        self.wavelet_head = nn.Conv2d(inChannels * 4, feat, 3, 1, 1)
+        self.wavelet_body = nn.Sequential(*[BasicBlock(feat, feat) for _ in range(numStages)])
+        self.wavelet_tail = nn.Conv2d(feat, outChannels * 4, 3, 1, 1)
+        self.idwt = IDWT()
+        
+        self.fusion = nn.Conv2d(outChannels * 2, outChannels, 1, 1, 0)
 
     @override
     def forward(self, x):
-        f0 = self.feat0(x)
-        f = self.feat1(f0)
+        # Pixel Branch
+        p = self.pixel_unshuffle(x)
+        p = self.pixel_head(p)
+        p = self.pixel_body(p)
+        p = self.pixel_tail(p)
+        p_out = self.pixel_shuffle(p)
         
-        res = []
-        for stage in self.stages:
-            f = stage(f)
-            res.append(f)
-            
-        out = torch.cat(res, dim=1)
-        out = self.bottleneck(out)
-        out = self.output(out)
+        # Wavelet Branch
+        w = self.dwt(x)
+        w = self.wavelet_head(w)
+        w = self.wavelet_body(w)
+        w = self.wavelet_tail(w)
+        w_out = self.idwt(w)
         
-        return out + x
+        # Fusion
+        return self.fusion(torch.cat([p_out, w_out], dim=1)) + x
 
 
 @final
@@ -107,7 +146,7 @@ class PixelwiseMSE(nn.Module):
 
 from graph import DeltaNode, PngNode, WebpNode
 
-def trainRBDN(datasetRoot: Path, usePixelwiseMSE: bool = True):
+def trainDPWSDNet(datasetRoot: Path, usePixelwiseMSE: bool = True):
     # Generate all the images needed for training.
     for fileName in (datasetRoot / "orig").iterdir():
         PngNode().run(datasetRoot, fileName.name)
@@ -119,7 +158,7 @@ def trainRBDN(datasetRoot: Path, usePixelwiseMSE: bool = True):
     valiLoader = DataLoader(valiData, shuffle=True)
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = RBDN().to(device)
+    model = DPW_SDNet().to(device)
     model = torch.compile(model, fullgraph=True)
     criterion = PixelwiseMSE() if usePixelwiseMSE else nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)

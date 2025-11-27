@@ -1,9 +1,9 @@
 import { Component, createResource } from 'solid-js'
 import Carousel from './Carousel'
-import { state, getImage, ImageType } from './rbdnModel';
+import { state, getImage, ImageType } from './dpwSdNetModel';
 import { Zoomer } from './Zoomer';
 
-const RBDNViewer: Component = () => {
+const DPWSDNetViewer: Component = () => {
   const [webpImg] = createResource(
     () => state.selectedImageFileName,
     (path) => getImage(path, ImageType.Webp, state)
@@ -12,13 +12,13 @@ const RBDNViewer: Component = () => {
     () => state.selectedImageFileName,
     (path) => getImage(path, ImageType.Mask, state)
   );
-  const [rbdnImg] = createResource(
+  const [dpwSdNetImg] = createResource(
     () => state.selectedImageFileName,
-    (path) => getImage(path, ImageType.RBDN, state)
+    (path) => getImage(path, ImageType.DPWSDNet, state)
   );
-  const [rbdnErrImg] = createResource(
+  const [dpwSdNetErrImg] = createResource(
     () => state.selectedImageFileName,
-    (path) => getImage(path, ImageType.RBDNErr, state)
+    (path) => getImage(path, ImageType.DPWSDNetErr, state)
   );
 
   return (
@@ -46,13 +46,13 @@ const RBDNViewer: Component = () => {
       >
         <Zoomer state={state} blobSrc={webpImg() ?? ""} />
         <Zoomer state={state} blobSrc={maskImg() ?? ""} />
-        <Zoomer state={state} blobSrc={rbdnImg() ?? ""} />
-        <Zoomer state={state} blobSrc={rbdnErrImg() ?? ""} />
+        <Zoomer state={state} blobSrc={dpwSdNetImg() ?? ""} />
+        <Zoomer state={state} blobSrc={dpwSdNetErrImg() ?? ""} />
       </div>
     </div>
   )
 }
 
-export default RBDNViewer;
+export default DPWSDNetViewer;
 
 //<Zoomer state={state} blobSrc={reconstructedImg() ?? ""} />

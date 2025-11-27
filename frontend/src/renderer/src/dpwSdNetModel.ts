@@ -4,8 +4,8 @@ import { createMutable } from "solid-js/store";
 export const enum ImageType {
   Webp = 'webp',
   Mask = 'mask',
-  RBDN = 'rbdn',
-  RBDNErr = 'rbdn_err',
+  DPWSDNet = 'dpw_sdnet',
+  DPWSDNetErr = 'dpw_sdnet_err',
 }
 
 /** @returns a blob url to the image in the current project that is fetched from the server */

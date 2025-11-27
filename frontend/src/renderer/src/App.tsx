@@ -1,12 +1,12 @@
 import { createSignal, Match, Switch, type Component } from 'solid-js'
 import SubtractionViewer from './SubtractionViewer'
 import ConvolutionViewer from './ConvolutionViewer'
-import RBDNViewer from './RBDNViewer'
+import DPWSDNetViewer from './DPWSDNetViewer'
 
 const enum Screen {
   Subtraction,
   Convolution,
-  RBDN,
+  DPWSDNet,
 }
 
 const App: Component = () => {
@@ -41,7 +41,7 @@ const App: Component = () => {
         ">
         <SidebarButton screen={Screen.Subtraction} />
         <SidebarButton screen={Screen.Convolution} />
-        <SidebarButton screen={Screen.RBDN} />
+        <SidebarButton screen={Screen.DPWSDNet} />
       </div>
       <Switch>
         <Match when={screen() === Screen.Subtraction}>
@@ -50,8 +50,8 @@ const App: Component = () => {
         <Match when={screen() === Screen.Convolution}>
           <ConvolutionViewer />
         </Match>
-        <Match when={screen() === Screen.RBDN}>
-          <RBDNViewer />
+        <Match when={screen() === Screen.DPWSDNet}>
+          <DPWSDNetViewer />
         </Match>
       </Switch>
     </div>
