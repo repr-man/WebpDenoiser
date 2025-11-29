@@ -3,7 +3,7 @@ import Carousel from './Carousel'
 import { state, getImage, ImageType } from './unetModel';
 import { Zoomer } from './Zoomer';
 
-const UNetViewer: Component = () => {
+const LightMUNetViewer: Component = () => {
   const [webpImg] = createResource(
     () => state.selectedImageFileName,
     (path) => getImage(path, ImageType.Webp, state)
@@ -12,11 +12,11 @@ const UNetViewer: Component = () => {
     () => state.selectedImageFileName,
     (path) => getImage(path, ImageType.Mask, state)
   );
-  const [unetImg] = createResource(
+  const [lightmImg] = createResource(
     () => state.selectedImageFileName,
-    (path) => getImage(path, ImageType.UNet, state)
+    (path) => getImage(path, ImageType.LightM, state)
   );
-  const [ErrorImg] = createResource(
+  const [errorImg] = createResource(
     () => state.selectedImageFileName,
     (path) => getImage(path, ImageType.Error, state)
   );
@@ -46,13 +46,13 @@ const UNetViewer: Component = () => {
       >
         <Zoomer state={state} blobSrc={webpImg() ?? ""} />
         <Zoomer state={state} blobSrc={maskImg() ?? ""} />
-        <Zoomer state={state} blobSrc={unetImg() ?? ""} />
-        <Zoomer state={state} blobSrc={ErrorImg() ?? ""} />
+        <Zoomer state={state} blobSrc={lightmImg() ?? ""} />
+        <Zoomer state={state} blobSrc={errorImg() ?? ""} />
       </div>
     </div>
   )
 }
 
-export default UNetViewer;
+export default LightMUNetViewer;
 
         //<Zoomer state={state} blobSrc={reconstructedImg() ?? ""} />

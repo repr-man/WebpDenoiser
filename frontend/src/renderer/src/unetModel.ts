@@ -4,7 +4,7 @@ import { createMutable } from "solid-js/store";
 export const enum ImageType {
   Webp = 'webp',
   Mask = 'mask',
-  UNet = 'unet',
+  LightM = 'lightm',
   Error = 'error',
 }
 

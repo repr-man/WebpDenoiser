@@ -2,7 +2,7 @@ from pathlib import Path
 from typing_extensions import Annotated
 import typer
 from dataset import loadDataset_CID22, loadDataset_GooglePng
-from model import trainUNet
+from model import trainLightMUNet
 from server import flaskServer
 
 app = typer.Typer()
@@ -23,7 +23,7 @@ def dataset(datasetroot: Annotated[str | None, typer.Argument()] = None):
     (root / "final").mkdir(parents=True, exist_ok=True)
     (root / "conv1").mkdir(parents=True, exist_ok=True)
     (root / "error").mkdir(parents=True, exist_ok=True)
-    (root / "unet").mkdir(parents=True, exist_ok=True)
+    (root / "lightm").mkdir(parents=True, exist_ok=True)
 
     # Download the dataset.
     #loadDataset_GooglePng(root)
@@ -45,7 +45,7 @@ def train(datasetroot: Annotated[Path | None, typer.Argument()] = None):
 
     # TODO: Train the model.  When we get to this part, we will want to put the
     # code in a file called `train.py` or `model.py` or something like that.
-    trainUNet(root, True)
+    trainLightMUNet(root, True)
 
 if __name__ == "__main__":
     app()

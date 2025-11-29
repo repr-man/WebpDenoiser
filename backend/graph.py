@@ -165,9 +165,9 @@ class Conv1Node(Node):
 from model import UNet
 
 @final
-class UNetComputationNode(Node):
+class LightMUNetComputationNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("unet", ".png", [WebpNode(log)], log)
+        super().__init__("lightm", ".png", [WebpNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
@@ -196,7 +196,7 @@ class UNetComputationNode(Node):
 @final
 class ErrorNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("error", ".png", [WebpNode(log), UNetComputationNode(log)], log)
+        super().__init__("error", ".png", [WebpNode(log), LightMUNetComputationNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
