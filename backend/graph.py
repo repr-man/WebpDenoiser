@@ -9,6 +9,8 @@ from torch import Tensor
 import torch
 from torchvision.transforms.functional import to_pil_image, to_tensor
 
+from sadnet import SADNET
+
 class Node:
     def __init__(self, cacheDirName: str, fileExt: str, parents: list["Node"], log: Logger | None = None):
         self.parents: list[Node] = parents
@@ -161,11 +163,9 @@ class Conv1Node(Node):
         transformed = cv2.filter2D(imageMat, -1, self.matrix)
         _ = cv2.imwrite(str(conv1Path), transformed)
 
-# This needs to be here to avoid circular imports.
-from model import UNet
 
 @final
-class UNetComputationNode(Node):
+class SadnetComputationNode(Node):
     def __init__(self, log: Logger | None = None):
         super().__init__("unet", ".png", [WebpNode(log)], log)
 
@@ -176,7 +176,7 @@ class UNetComputationNode(Node):
         modelPath = projectRoot / "model.pt"
         outputPath = self.getPath(projectRoot, fileName)
         webp = self.parents[0].getTensor(projectRoot, fileName)
-        model = UNet().to(device)
+        model = SADNET().to(device)
 
         state_dict = torch.load(modelPath, map_location=torch.device(device))
         new_state_dict = {}
@@ -196,7 +196,7 @@ class UNetComputationNode(Node):
 @final
 class ErrorNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("error", ".png", [WebpNode(log), UNetComputationNode(log)], log)
+        super().__init__("error", ".png", [WebpNode(log), SadnetComputationNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
