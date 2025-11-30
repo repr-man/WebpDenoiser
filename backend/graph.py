@@ -162,12 +162,12 @@ class Conv1Node(Node):
         _ = cv2.imwrite(str(conv1Path), transformed)
 
 # This needs to be here to avoid circular imports.
-from model import UNet
+from model import RCAN_Deblocking
 
 @final
-class UNetComputationNode(Node):
+class RCANComputationNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("unet", ".png", [WebpNode(log)], log)
+        super().__init__("rcan", ".png", [WebpNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
@@ -176,7 +176,7 @@ class UNetComputationNode(Node):
         modelPath = projectRoot / "model.pt"
         outputPath = self.getPath(projectRoot, fileName)
         webp = self.parents[0].getTensor(projectRoot, fileName)
-        model = UNet().to(device)
+        model = RCAN_Deblocking().to(device)
 
         state_dict = torch.load(modelPath, map_location=torch.device(device))
         new_state_dict = {}
@@ -196,7 +196,7 @@ class UNetComputationNode(Node):
 @final
 class ErrorNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("error", ".png", [WebpNode(log), UNetComputationNode(log)], log)
+        super().__init__("error", ".png", [WebpNode(log), RCANComputationNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
