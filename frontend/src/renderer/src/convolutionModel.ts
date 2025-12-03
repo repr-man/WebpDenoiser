@@ -2,7 +2,7 @@ import { Accessor } from "solid-js";
 import { createMutable } from "solid-js/store";
 
 export const enum ImageType {
-  Webp = 'webp',
+  Jpeg = 'jpeg',
 }
 
 export const enum ConvolutionType {

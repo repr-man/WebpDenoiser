@@ -8,9 +8,9 @@ const SubtractionViewer: Component = () => {
     () => state.selectedImageFileName,
     (path) => getImage(path, ImageType.Orig, state)
   );
-  const [webpImg] = createResource(
+  const [jpegImg] = createResource(
     () => state.selectedImageFileName,
-    (path) => getImage(path, ImageType.Webp, state)
+    (path) => getImage(path, ImageType.Jpeg, state)
   );
   const [maskImg] = createResource(
     () => state.selectedImageFileName,
@@ -45,7 +45,7 @@ const SubtractionViewer: Component = () => {
         onMouseLeave={() => { state.isHovered = false; }}
       >
         <Zoomer state={state} blobSrc={origImg() ?? ""} />
-        <Zoomer state={state} blobSrc={webpImg() ?? ""} />
+        <Zoomer state={state} blobSrc={jpegImg() ?? ""} />
         <Zoomer state={state} blobSrc={maskImg() ?? ""} />
         <Zoomer state={state} blobSrc={finalImg() ?? ""} />
       </div>

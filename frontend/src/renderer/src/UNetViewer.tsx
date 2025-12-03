@@ -4,9 +4,9 @@ import { state, getImage, ImageType } from './unetModel';
 import { Zoomer } from './Zoomer';
 
 const UNetViewer: Component = () => {
-  const [webpImg] = createResource(
+  const [jpegImg] = createResource(
     () => state.selectedImageFileName,
-    (path) => getImage(path, ImageType.Webp, state)
+    (path) => getImage(path, ImageType.Jpeg, state)
   );
   const [maskImg] = createResource(
     () => state.selectedImageFileName,
@@ -44,7 +44,7 @@ const UNetViewer: Component = () => {
         onMouseEnter={() => { state.isHovered = true; }}
         onMouseLeave={() => { state.isHovered = false; }}
       >
-        <Zoomer state={state} blobSrc={webpImg() ?? ""} />
+        <Zoomer state={state} blobSrc={jpegImg() ?? ""} />
         <Zoomer state={state} blobSrc={maskImg() ?? ""} />
         <Zoomer state={state} blobSrc={unetImg() ?? ""} />
         <Zoomer state={state} blobSrc={ErrorImg() ?? ""} />
@@ -55,4 +55,4 @@ const UNetViewer: Component = () => {
 
 export default UNetViewer;
 
-        //<Zoomer state={state} blobSrc={reconstructedImg() ?? ""} />
+//<Zoomer state={state} blobSrc={reconstructedImg() ?? ""} />

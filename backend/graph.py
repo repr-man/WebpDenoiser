@@ -65,31 +65,31 @@ class PngNode(Node):
 
 
 @final
-class WebpNode(Node):
+class JpegNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("webp", ".webp", [PngNode(log)], log)
+        super().__init__("jpeg", ".jpg", [PngNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
         super().run(projectRoot, fileName)
         path = self.getPath(projectRoot, fileName)
         png = self.parents[0].getImage(projectRoot, fileName)
-        _ = png.convert("RGB").save(path, format="webp")
+        _ = png.convert("RGB").save(path, format="jpeg")
 
 
 @final
 class DeltaNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("delta", ".bin", [PngNode(log), WebpNode(log)], log)
+        super().__init__("delta", ".bin", [PngNode(log), JpegNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
         super().run(projectRoot, fileName)
         png = self.parents[0].getImage(projectRoot, fileName)
-        webp = self.parents[1].getImage(projectRoot, fileName)
+        jpeg = self.parents[1].getImage(projectRoot, fileName)
         pngArr = np.array(png, dtype=np.int16)
-        webpArr = np.array(webp, dtype=np.int16)
-        delta = pngArr - webpArr
+        jpegArr = np.array(jpeg, dtype=np.int16)
+        delta = pngArr - jpegArr
         delta = delta.reshape(png.size[0], png.size[1], 3)
         delta.tofile(self.getPath(projectRoot, fileName))
             
@@ -126,24 +126,24 @@ class MaskNode(Node):
 @final
 class FinalNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("final", ".png", [WebpNode(log), DeltaNode(log)], log)
+        super().__init__("final", ".png", [JpegNode(log), DeltaNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
         super().run(projectRoot, fileName)
-        webp = self.parents[0].getImage(projectRoot, fileName)
+        jpeg = self.parents[0].getImage(projectRoot, fileName)
         deltaBytes = self.parents[1].getBytes(projectRoot, fileName)
-        webpArr = np.frombuffer(webp.tobytes(), dtype=np.uint8)
+        jpegArr = np.frombuffer(jpeg.tobytes(), dtype=np.uint8)
         deltaArr = np.frombuffer(deltaBytes, dtype=np.int16)
-        finalArr = webpArr + deltaArr
+        finalArr = jpegArr + deltaArr
         finalBytes = finalArr.astype(np.uint8).tobytes()
         path = self.getPath(projectRoot, fileName)
-        Image.frombytes("RGB", webp.size, finalBytes).save(path)
+        Image.frombytes("RGB", jpeg.size, finalBytes).save(path)
 
 @final
 class Conv1Node(Node):
     def __init__(self, matrix: np.ndarray, log: Logger | None = None):
-        super().__init__("conv1", ".png", [WebpNode(log)], log)
+        super().__init__("conv1", ".png", [JpegNode(log)], log)
         self.matrix = matrix
 
     @override
@@ -153,9 +153,9 @@ class Conv1Node(Node):
     @override
     def run(self, projectRoot: Path, fileName: str):
         super().run(projectRoot, fileName)
-        webpPath = self.parents[0].getPath(projectRoot, fileName)
+        jpegPath = self.parents[0].getPath(projectRoot, fileName)
         conv1Path = self.getPath(projectRoot, fileName)
-        imageMat = cv2.imread(str(webpPath), cv2.IMREAD_UNCHANGED)
+        imageMat = cv2.imread(str(jpegPath), cv2.IMREAD_UNCHANGED)
         if imageMat is None:
             raise Exception("Failed to read image")
         transformed = cv2.filter2D(imageMat, -1, self.matrix)
@@ -167,7 +167,7 @@ from model import UNet
 @final
 class UNetComputationNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("unet", ".png", [WebpNode(log)], log)
+        super().__init__("unet", ".png", [JpegNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
@@ -175,7 +175,7 @@ class UNetComputationNode(Node):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         modelPath = projectRoot / "model.pt"
         outputPath = self.getPath(projectRoot, fileName)
-        webp = self.parents[0].getTensor(projectRoot, fileName)
+        jpeg = self.parents[0].getTensor(projectRoot, fileName)
         model = UNet().to(device)
 
         state_dict = torch.load(modelPath, map_location=torch.device(device))
@@ -187,8 +187,8 @@ class UNetComputationNode(Node):
 
         _ = model.load_state_dict(new_state_dict)
         #_ = model.load_state_dict(torch.load(modelPath, map_location=torch.device(device)))
-        webp = webp.unsqueeze(0)
-        newImgTensor = model(webp).squeeze(0)
+        jpeg = jpeg.unsqueeze(0)
+        newImgTensor = model(jpeg).squeeze(0)
         pilImg = to_pil_image(newImgTensor)
         pilImg.save(outputPath, format="png")
 
@@ -196,22 +196,22 @@ class UNetComputationNode(Node):
 @final
 class ErrorNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("error", ".png", [WebpNode(log), UNetComputationNode(log)], log)
+        super().__init__("error", ".png", [JpegNode(log), UNetComputationNode(log)], log)
 
     @override
     def run(self, projectRoot: Path, fileName: str):
         super().run(projectRoot, fileName)
         outputPath = self.getPath(projectRoot, fileName)
         unet = self.parents[1].getTensor(projectRoot, fileName)
-        webp = self.parents[0].getTensor(projectRoot, fileName)
+        jpeg = self.parents[0].getTensor(projectRoot, fileName)
         for i in range(unet.shape[2]):
             for j in range(unet.shape[1]):
                 if i == 0 and j == 0:
                     self.log(unet[:, j, i])
-                    self.log(webp[:, j, i])
-                rSame = unet[0, j, i].item() == webp[0, j, i].item()
-                gSame = unet[1, j, i].item() == webp[1, j, i].item()
-                bSame = unet[2, j, i].item() == webp[2, j, i].item()
+                    self.log(jpeg[:, j, i])
+                rSame = unet[0, j, i].item() == jpeg[0, j, i].item()
+                gSame = unet[1, j, i].item() == jpeg[1, j, i].item()
+                bSame = unet[2, j, i].item() == jpeg[2, j, i].item()
                 if (rSame and gSame and bSame):
                     unet[0, j, i] = 0
                     unet[1, j, i] = 0

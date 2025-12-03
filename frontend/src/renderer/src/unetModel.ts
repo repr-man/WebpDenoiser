@@ -2,14 +2,14 @@ import { Accessor } from "solid-js";
 import { createMutable } from "solid-js/store";
 
 export const enum ImageType {
-  Webp = 'webp',
+  Jpeg = 'jpeg',
   Mask = 'mask',
   UNet = 'unet',
   Error = 'error',
 }
 
 /** @returns a blob url to the image in the current project that is fetched from the server */
-export async function getImage(fileName: string | undefined, imgType: ImageType, state: {projectRoot: string | undefined}) {
+export async function getImage(fileName: string | undefined, imgType: ImageType, state: { projectRoot: string | undefined }) {
   if (!fileName) return "";
   const res = await fetch(`http://localhost:5000/get-image-${imgType}`, {
     method: 'POST',

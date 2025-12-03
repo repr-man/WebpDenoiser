@@ -17,7 +17,7 @@ def dataset(datasetroot: Annotated[str | None, typer.Argument()] = None):
         root = Path(datasetroot).resolve()
     root.mkdir(parents=True, exist_ok=True)
     (root / "orig").mkdir(parents=True, exist_ok=True)
-    (root / "webp").mkdir(parents=True, exist_ok=True)
+    (root / "jpeg").mkdir(parents=True, exist_ok=True)
     (root / "delta").mkdir(parents=True, exist_ok=True)
     (root / "mask").mkdir(parents=True, exist_ok=True)
     (root / "final").mkdir(parents=True, exist_ok=True)

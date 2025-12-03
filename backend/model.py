@@ -85,14 +85,14 @@ class OurDataset(Dataset[tuple[Tensor, Tensor]]):
         super().__init__()
         self.root = root
         orig = root / "orig"
-        webp = root / "webp"
+        jpeg = root / "jpeg"
         delta = root / "delta"
         if (
             not orig.exists()
-            or not webp.exists()
+            or not jpeg.exists()
             or not delta.exists()
             #or next(orig.iterdir(), None) is None
-            #or next(webp.iterdir(), None) is None
+            #or next(jpeg.iterdir(), None) is None
             #or next(delta.iterdir(), None) is None
         ):
             assert False, "CID22 dataset not downloaded."
@@ -100,13 +100,13 @@ class OurDataset(Dataset[tuple[Tensor, Tensor]]):
 
     @override
     def __getitem__(self, index: int):
-        webp = WebpNode().getTensor(self.root, self.filenames[index])
+        jpeg = JpegNode().getTensor(self.root, self.filenames[index])
 
         png = PngNode().getTensor(self.root, self.filenames[index])
-        return webp, png
+        return jpeg, png
 
         #delta = DeltaNode().getTensor(self.root, self.filenames[index])
-        #return webp, delta
+        #return jpeg, delta
 
     def __len__(self):
         return len(self.filenames)
@@ -125,7 +125,7 @@ class PixelwiseMSE(nn.Module):
         return torch.mean(torch.mean((x.squeeze(0) - y.squeeze(0)) ** 2, dim=0))
 
 
-from graph import DeltaNode, PngNode, WebpNode
+from graph import DeltaNode, PngNode, JpegNode
 
 def trainUNet(datasetRoot: Path, usePixelwiseMSE: bool = True):
     # Generate all the images needed for training.
@@ -150,12 +150,12 @@ def trainUNet(datasetRoot: Path, usePixelwiseMSE: bool = True):
         _ = model.train()
         trainRunningLoss = 0
         for img in tqdm(trainLoader):
-            webp: Tensor = img[0].float().to(device)
+            jpeg: Tensor = img[0].float().to(device)
             
             #delta: Tensor = img[1].float().to(device)
             png: Tensor = img[1].float().to(device)
             
-            prediction = model(webp)
+            prediction = model(jpeg)
             optimizer.zero_grad()
 
             #loss = criterion(prediction, delta)
@@ -170,12 +170,12 @@ def trainUNet(datasetRoot: Path, usePixelwiseMSE: bool = True):
         valiRunningLoss = 0
         with torch.no_grad():
             for img in tqdm(valiLoader):
-                webp: Tensor = img[0].float().to(device)
+                jpeg: Tensor = img[0].float().to(device)
 
                 #delta: Tensor = img[1].float().to(device)
                 png: Tensor = img[1].float().to(device)
 
-                prediction = model(webp)
+                prediction = model(jpeg)
 
                 #loss = criterion(prediction, delta)
                 loss = criterion(prediction, png)

@@ -6,9 +6,9 @@ import Carousel from "./Carousel";
 import { getImage, ImageType } from "./subtractionModel";
 
 const ConvolutionViewer: Component = () => {
-  const [webpImg] = createResource(
+  const [jpegImg] = createResource(
     () => state.selectedImageFileName,
-    (path) => getImage(path, ImageType.Webp, state)
+    (path) => getImage(path, ImageType.Jpeg, state)
   );
   const [maskImg] = createResource(
     () => state.selectedImageFileName,
@@ -49,7 +49,7 @@ const ConvolutionViewer: Component = () => {
         onMouseEnter={() => { state.isHovered = true; }}
         onMouseLeave={() => { state.isHovered = false; }}
       >
-        <Zoomer state={state} blobSrc={webpImg() ?? ""} />
+        <Zoomer state={state} blobSrc={jpegImg() ?? ""} />
         <Zoomer state={state} blobSrc={maskImg() ?? ""} />
         <ConvolutionInput />
         <Zoomer state={state} blobSrc={conv1Img() ?? ""} />

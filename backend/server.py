@@ -3,7 +3,7 @@ from pathlib import Path
 from flask import Flask, Request, request, jsonify
 from flask_cors import CORS
 
-from graph import FinalNode, MaskNode, PngNode, UNetComputationNode, ErrorNode, WebpNode, Conv1Node
+from graph import FinalNode, MaskNode, PngNode, UNetComputationNode, ErrorNode, JpegNode, Conv1Node
 
 flaskServer = Flask(__name__)
 _ = CORS(flaskServer)
@@ -63,8 +63,8 @@ def requestGetImage():
     return PngNode().getBytes(root, fileName)
 
 
-@flaskServer.route("/get-image-webp", methods=["POST"])
-def requestGetWebp():
+@flaskServer.route("/get-image-jpeg", methods=["POST"])
+def requestGetJpeg():
     """
     Receives a JSON payload of the form:
     {
@@ -72,10 +72,10 @@ def requestGetWebp():
         "fileName": "filename.png"
     }
     Returns the contents of the file at
-    '/path/to/root/dir/webp/filename.webp'.
+    '/path/to/root/dir/jpeg/filename.jpg'.
     """
     root, fileName = getProjectParts(request)
-    return WebpNode().getBytes(root, fileName)
+    return JpegNode().getBytes(root, fileName)
 
 
 @flaskServer.route("/get-image-mask", methods=["POST"])
