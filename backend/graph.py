@@ -25,7 +25,7 @@ class Node:
             self._log.warning(message)
 
     def getPath(self, projectRoot: Path, fileName: str) -> Path:
-        return projectRoot / self.cacheDirName / fileName.replace(".png", self.fileExt)
+        return projectRoot / "vali" / self.cacheDirName / fileName.replace(".png", self.fileExt)
 
     def needsRerun(self, projectRoot: Path, fileName: str) -> bool:
         return not self.getPath(projectRoot, fileName).exists()
@@ -217,4 +217,154 @@ class ErrorNode(Node):
                     unet[1, j, i] = 0
                     unet[2, j, i] = 0
         pilImg = to_pil_image(unet)
+        pilImg.save(outputPath, format="png")
+
+
+import torch.nn.functional as F
+
+class SobelNode(Node):
+    def __init__(self, channel: int, cacheDirName: str, log: Logger | None = None):
+        super().__init__(cacheDirName, ".png", [JpegNode(log)], log)
+        self.channel = channel
+
+    @override
+    def run(self, projectRoot: Path, fileName: str):
+        super().run(projectRoot, fileName)
+        jpegPath = self.parents[0].getPath(projectRoot, fileName)
+        outputPath = self.getPath(projectRoot, fileName)
+        
+        # Load image and convert to YCbCr
+        img = Image.open(jpegPath).convert("YCbCr")
+        # Extract specific channel
+        channel_img = img.split()[self.channel]
+        # Convert to tensor and add batch/channel dims: [1, 1, H, W]
+        tensor = to_tensor(channel_img).unsqueeze(0)
+        
+        # Define Sobel kernels
+        sobel_x = torch.tensor([[-1., 0., 1.], [-2., 0., 2.], [-1., 0., 1.]]).view(1, 1, 3, 3)
+        sobel_y = torch.tensor([[-1., -2., -1.], [0., 0., 0.], [1., 2., 1.]]).view(1, 1, 3, 3)
+        
+        # Apply filters
+        grad_x = F.conv2d(tensor, sobel_x, padding=1)
+        grad_y = F.conv2d(tensor, sobel_y, padding=1)
+        
+        # Calculate magnitude
+        magnitude = torch.sqrt(grad_x**2 + grad_y**2)
+        
+        # Normalize to 0-1 range for saving
+        magnitude = magnitude / magnitude.max() if magnitude.max() > 0 else magnitude
+        
+        pilImg = to_pil_image(magnitude.squeeze(0))
+        pilImg.save(outputPath, format="png")
+
+@final
+class SobelYNode(SobelNode):
+    def __init__(self, log: Logger | None = None):
+        super().__init__(0, "sobel_y", log)
+
+@final
+class SobelCbNode(SobelNode):
+    def __init__(self, log: Logger | None = None):
+        super().__init__(1, "sobel_cb", log)
+
+@final
+class SobelCrNode(SobelNode):
+    def __init__(self, log: Logger | None = None):
+        super().__init__(2, "sobel_cr", log)
+
+@final
+class SobelSumNode(Node):
+    def __init__(self, log: Logger | None = None):
+        super().__init__("sobel_sum", ".png", [SobelYNode(log), SobelCbNode(log), SobelCrNode(log)], log)
+
+    @override
+    def run(self, projectRoot: Path, fileName: str):
+        super().run(projectRoot, fileName)
+        outputPath = self.getPath(projectRoot, fileName)
+        
+        y = self.parents[0].getTensor(projectRoot, fileName)
+        cb = self.parents[1].getTensor(projectRoot, fileName)
+        cr = self.parents[2].getTensor(projectRoot, fileName)
+        
+        # Sum the tensors
+        total = y + cb + cr
+        
+        # Clamp to valid range [0, 1]
+        total = torch.clamp(total, 0, 1)
+        
+        pilImg = to_pil_image(total)
+        pilImg.save(outputPath, format="png")
+
+
+class SobelRGBNode(Node):
+    def __init__(self, channel: int, cacheDirName: str, log: Logger | None = None):
+        super().__init__(cacheDirName, ".png", [JpegNode(log)], log)
+        self.channel = channel
+
+    @override
+    def run(self, projectRoot: Path, fileName: str):
+        super().run(projectRoot, fileName)
+        jpegPath = self.parents[0].getPath(projectRoot, fileName)
+        outputPath = self.getPath(projectRoot, fileName)
+        
+        # Load image and keep as RGB
+        img = Image.open(jpegPath).convert("RGB")
+        # Extract specific channel
+        channel_img = img.split()[self.channel]
+        # Convert to tensor and add batch/channel dims: [1, 1, H, W]
+        tensor = to_tensor(channel_img).unsqueeze(0)
+        
+        # Define Sobel kernels
+        sobel_x = torch.tensor([[-1., 0., 1.], [-2., 0., 2.], [-1., 0., 1.]]).view(1, 1, 3, 3)
+        sobel_y = torch.tensor([[-1., -2., -1.], [0., 0., 0.], [1., 2., 1.]]).view(1, 1, 3, 3)
+        
+        # Apply filters
+        grad_x = F.conv2d(tensor, sobel_x, padding=1)
+        grad_y = F.conv2d(tensor, sobel_y, padding=1)
+        
+        # Calculate magnitude
+        magnitude = torch.sqrt(grad_x**2 + grad_y**2)
+        
+        # Normalize to 0-1 range for saving
+        magnitude = magnitude / magnitude.max() if magnitude.max() > 0 else magnitude
+        
+        pilImg = to_pil_image(magnitude.squeeze(0))
+        pilImg.save(outputPath, format="png")
+
+@final
+class SobelRNode(SobelRGBNode):
+    def __init__(self, log: Logger | None = None):
+        super().__init__(0, "sobel_r", log)
+
+@final
+class SobelGNode(SobelRGBNode):
+    def __init__(self, log: Logger | None = None):
+        super().__init__(1, "sobel_g", log)
+
+@final
+class SobelBNode(SobelRGBNode):
+    def __init__(self, log: Logger | None = None):
+        super().__init__(2, "sobel_b", log)
+
+@final
+class SobelRGBSumNode(Node):
+    def __init__(self, log: Logger | None = None):
+        super().__init__("sobel_rgb_sum", ".png", [SobelRNode(log), SobelGNode(log), SobelBNode(log)], log)
+
+    @override
+    def run(self, projectRoot: Path, fileName: str):
+        super().run(projectRoot, fileName)
+        outputPath = self.getPath(projectRoot, fileName)
+        
+        r = self.parents[0].getTensor(projectRoot, fileName)
+        g = self.parents[1].getTensor(projectRoot, fileName)
+        b = self.parents[2].getTensor(projectRoot, fileName)
+        
+        # Sum the tensors
+        total = r + g + b
+        
+        # Clamp to valid range [0, 1]
+        total = torch.clamp(total, 0, 1)
+        
+        pilImg = to_pil_image(total)
         pilImg.save(outputPath, format="png")
