@@ -368,3 +368,28 @@ class SobelRGBSumNode(Node):
         
         pilImg = to_pil_image(total)
         pilImg.save(outputPath, format="png")
+
+
+from torchvision.transforms.functional import gaussian_blur
+
+@final
+class WeightedBlurNode(Node):
+    def __init__(self, log: Logger | None = None):
+        super().__init__("weighted_blur", ".png", [JpegNode(log), SobelSumNode(log)], log)
+
+    @override
+    def run(self, projectRoot: Path, fileName: str):
+        super().run(projectRoot, fileName)
+        outputPath = self.getPath(projectRoot, fileName)
+        
+        jpeg = self.parents[0].getTensor(projectRoot, fileName)
+        sobel_sum = self.parents[1].getTensor(projectRoot, fileName)
+        
+        mask = 1.0 - sobel_sum
+        
+        blurred = gaussian_blur(jpeg, kernel_size=5)
+        
+        result = blurred * mask + jpeg * (1.0 - mask)
+        
+        pilImg = to_pil_image(result)
+        pilImg.save(outputPath, format="png")
