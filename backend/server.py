@@ -3,7 +3,7 @@ from pathlib import Path
 from flask import Flask, Request, request, jsonify
 from flask_cors import CORS
 
-from graph import FinalNode, MaskNode, PngNode, UNetComputationNode, ErrorNode, JpegNode, Conv1Node, SobelYNode, SobelCbNode, SobelCrNode, SobelSumNode, SobelRNode, SobelGNode, SobelBNode, SobelRGBSumNode, WeightedBlurNode
+from graph import FinalNode, MaskNode, PngNode, UNetComputationNode, ErrorNode, JpegNode, Conv1Node, SobelYNode, SobelCbNode, SobelCrNode, SobelSumNode, SobelRNode, SobelGNode, SobelBNode, SobelRGBSumNode, WeightedBlurNode, SobelMaskNode, WeightedMaskNode
 
 flaskServer = Flask(__name__)
 _ = CORS(flaskServer)
@@ -275,3 +275,31 @@ def requestGetWeightedBlur():
     """
     root, fileName = getProjectParts(request)
     return WeightedBlurNode(log).getBytes(root, fileName)
+
+@flaskServer.route("/get-image-sobel-mask", methods=["POST"])
+def requestGetSobelMask():
+    """
+    Receives a JSON payload of the form:
+    {
+        "projectRoot": "/path/to/root/dir",
+        "fileName": "filename.png"
+    }
+    Returns the contents of the file at
+    '/path/to/root/dir/sobel_mask/filename.png'.
+    """
+    root, fileName = getProjectParts(request)
+    return SobelMaskNode(log).getBytes(root, fileName)
+
+@flaskServer.route("/get-image-weighted-mask", methods=["POST"])
+def requestGetWeightedMask():
+    """
+    Receives a JSON payload of the form:
+    {
+        "projectRoot": "/path/to/root/dir",
+        "fileName": "filename.png"
+    }
+    Returns the contents of the file at
+    '/path/to/root/dir/weighted_mask/filename.png'.
+    """
+    root, fileName = getProjectParts(request)
+    return WeightedMaskNode(log).getBytes(root, fileName)

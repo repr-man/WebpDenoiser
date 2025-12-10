@@ -20,6 +20,14 @@ const WeightedBlurViewer: Component = () => {
         () => state.selectedImageFileName,
         (path) => getWeightedBlurImage(path, WeightedBlurType.WeightedBlur, state)
     );
+    const [sobelMaskImg] = createResource(
+        () => state.selectedImageFileName,
+        (path) => getWeightedBlurImage(path, WeightedBlurType.SobelMask, state)
+    );
+    const [weightedMaskImg] = createResource(
+        () => state.selectedImageFileName,
+        (path) => getWeightedBlurImage(path, WeightedBlurType.WeightedMask, state)
+    );
 
     return (
         <div class="
@@ -31,7 +39,7 @@ const WeightedBlurViewer: Component = () => {
             <Carousel state={state} />
             <div class="
         h-full
-        grid grid-cols-2 grid-rows-2
+        grid grid-cols-3 grid-rows-2
         gap-2 justify-center content-center
         overflow-hidden
         "
@@ -45,9 +53,11 @@ const WeightedBlurViewer: Component = () => {
                 onMouseLeave={() => { state.isHovered = false; }}
             >
                 <Zoomer state={state} blobSrc={jpegImg() ?? ""} />
+                <Zoomer state={state} blobSrc={blurImg() ?? ""} />
+                <Zoomer state={state} blobSrc={sobelMaskImg() ?? ""} />
                 <Zoomer state={state} blobSrc={maskImg() ?? ""} />
                 <Zoomer state={state} blobSrc={sumImg() ?? ""} />
-                <Zoomer state={state} blobSrc={blurImg() ?? ""} />
+                <Zoomer state={state} blobSrc={weightedMaskImg() ?? ""} />
             </div>
         </div>
     )

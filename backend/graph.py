@@ -1,4 +1,5 @@
 from logging import Logger
+import io
 import cv2
 import numpy as np
 from pathlib import Path
@@ -228,13 +229,22 @@ class SobelNode(Node):
         self.channel = channel
 
     @override
-    def run(self, projectRoot: Path, fileName: str):
-        super().run(projectRoot, fileName)
-        jpegPath = self.parents[0].getPath(projectRoot, fileName)
-        outputPath = self.getPath(projectRoot, fileName)
-        
+    def getTensor(self, projectRoot: Path, fileName: str) -> Tensor:
+        return self._compute(projectRoot, fileName)
+
+    @override
+    def getImage(self, projectRoot: Path, fileName: str) -> Image.Image:
+        return to_pil_image(self.getTensor(projectRoot, fileName))
+
+    @override
+    def getBytes(self, projectRoot: Path, fileName: str) -> bytes:
+        buf = io.BytesIO()
+        self.getImage(projectRoot, fileName).save(buf, format="png")
+        return buf.getvalue()
+
+    def _compute(self, projectRoot: Path, fileName: str) -> Tensor:
         # Load image and convert to YCbCr
-        img = Image.open(jpegPath).convert("YCbCr")
+        img = self.parents[0].getImage(projectRoot, fileName).convert("YCbCr")
         # Extract specific channel
         channel_img = img.split()[self.channel]
         # Convert to tensor and add batch/channel dims: [1, 1, H, W]
@@ -254,8 +264,7 @@ class SobelNode(Node):
         # Normalize to 0-1 range for saving
         magnitude = magnitude / magnitude.max() if magnitude.max() > 0 else magnitude
         
-        pilImg = to_pil_image(magnitude.squeeze(0))
-        pilImg.save(outputPath, format="png")
+        return magnitude.squeeze(0)
 
 @final
 class SobelYNode(SobelNode):
@@ -278,10 +287,20 @@ class SobelSumNode(Node):
         super().__init__("sobel_sum", ".png", [SobelYNode(log), SobelCbNode(log), SobelCrNode(log)], log)
 
     @override
-    def run(self, projectRoot: Path, fileName: str):
-        super().run(projectRoot, fileName)
-        outputPath = self.getPath(projectRoot, fileName)
-        
+    def getTensor(self, projectRoot: Path, fileName: str) -> Tensor:
+        return self._compute(projectRoot, fileName)
+
+    @override
+    def getImage(self, projectRoot: Path, fileName: str) -> Image.Image:
+        return to_pil_image(self.getTensor(projectRoot, fileName))
+
+    @override
+    def getBytes(self, projectRoot: Path, fileName: str) -> bytes:
+        buf = io.BytesIO()
+        self.getImage(projectRoot, fileName).save(buf, format="png")
+        return buf.getvalue()
+
+    def _compute(self, projectRoot: Path, fileName: str) -> Tensor:
         y = self.parents[0].getTensor(projectRoot, fileName)
         cb = self.parents[1].getTensor(projectRoot, fileName)
         cr = self.parents[2].getTensor(projectRoot, fileName)
@@ -292,8 +311,7 @@ class SobelSumNode(Node):
         # Clamp to valid range [0, 1]
         total = torch.clamp(total, 0, 1)
         
-        pilImg = to_pil_image(total)
-        pilImg.save(outputPath, format="png")
+        return total
 
 
 class SobelRGBNode(Node):
@@ -302,13 +320,22 @@ class SobelRGBNode(Node):
         self.channel = channel
 
     @override
-    def run(self, projectRoot: Path, fileName: str):
-        super().run(projectRoot, fileName)
-        jpegPath = self.parents[0].getPath(projectRoot, fileName)
-        outputPath = self.getPath(projectRoot, fileName)
-        
+    def getTensor(self, projectRoot: Path, fileName: str) -> Tensor:
+        return self._compute(projectRoot, fileName)
+
+    @override
+    def getImage(self, projectRoot: Path, fileName: str) -> Image.Image:
+        return to_pil_image(self.getTensor(projectRoot, fileName))
+
+    @override
+    def getBytes(self, projectRoot: Path, fileName: str) -> bytes:
+        buf = io.BytesIO()
+        self.getImage(projectRoot, fileName).save(buf, format="png")
+        return buf.getvalue()
+
+    def _compute(self, projectRoot: Path, fileName: str) -> Tensor:
         # Load image and keep as RGB
-        img = Image.open(jpegPath).convert("RGB")
+        img = self.parents[0].getImage(projectRoot, fileName).convert("RGB")
         # Extract specific channel
         channel_img = img.split()[self.channel]
         # Convert to tensor and add batch/channel dims: [1, 1, H, W]
@@ -328,8 +355,7 @@ class SobelRGBNode(Node):
         # Normalize to 0-1 range for saving
         magnitude = magnitude / magnitude.max() if magnitude.max() > 0 else magnitude
         
-        pilImg = to_pil_image(magnitude.squeeze(0))
-        pilImg.save(outputPath, format="png")
+        return magnitude.squeeze(0)
 
 @final
 class SobelRNode(SobelRGBNode):
@@ -352,10 +378,20 @@ class SobelRGBSumNode(Node):
         super().__init__("sobel_rgb_sum", ".png", [SobelRNode(log), SobelGNode(log), SobelBNode(log)], log)
 
     @override
-    def run(self, projectRoot: Path, fileName: str):
-        super().run(projectRoot, fileName)
-        outputPath = self.getPath(projectRoot, fileName)
-        
+    def getTensor(self, projectRoot: Path, fileName: str) -> Tensor:
+        return self._compute(projectRoot, fileName)
+
+    @override
+    def getImage(self, projectRoot: Path, fileName: str) -> Image.Image:
+        return to_pil_image(self.getTensor(projectRoot, fileName))
+
+    @override
+    def getBytes(self, projectRoot: Path, fileName: str) -> bytes:
+        buf = io.BytesIO()
+        self.getImage(projectRoot, fileName).save(buf, format="png")
+        return buf.getvalue()
+
+    def _compute(self, projectRoot: Path, fileName: str) -> Tensor:
         r = self.parents[0].getTensor(projectRoot, fileName)
         g = self.parents[1].getTensor(projectRoot, fileName)
         b = self.parents[2].getTensor(projectRoot, fileName)
@@ -366,8 +402,32 @@ class SobelRGBSumNode(Node):
         # Clamp to valid range [0, 1]
         total = torch.clamp(total, 0, 1)
         
-        pilImg = to_pil_image(total)
-        pilImg.save(outputPath, format="png")
+        return total
+
+
+@final
+class SobelMaskNode(Node):
+    def __init__(self, log: Logger | None = None):
+        super().__init__("sobel_mask", ".png", [SobelSumNode(log)], log)
+
+    @override
+    def getTensor(self, projectRoot: Path, fileName: str) -> Tensor:
+        return self._compute(projectRoot, fileName)
+
+    @override
+    def getImage(self, projectRoot: Path, fileName: str) -> Image.Image:
+        return to_pil_image(self.getTensor(projectRoot, fileName))
+
+    @override
+    def getBytes(self, projectRoot: Path, fileName: str) -> bytes:
+        buf = io.BytesIO()
+        self.getImage(projectRoot, fileName).save(buf, format="png")
+        return buf.getvalue()
+
+    def _compute(self, projectRoot: Path, fileName: str) -> Tensor:
+        sobel_sum = self.parents[0].getTensor(projectRoot, fileName)
+        mask = 1.0 - sobel_sum
+        return mask
 
 
 from torchvision.transforms.functional import gaussian_blur
@@ -375,21 +435,72 @@ from torchvision.transforms.functional import gaussian_blur
 @final
 class WeightedBlurNode(Node):
     def __init__(self, log: Logger | None = None):
-        super().__init__("weighted_blur", ".png", [JpegNode(log), SobelSumNode(log)], log)
+        super().__init__("weighted_blur", ".png", [JpegNode(log), SobelMaskNode(log)], log)
 
     @override
-    def run(self, projectRoot: Path, fileName: str):
-        super().run(projectRoot, fileName)
-        outputPath = self.getPath(projectRoot, fileName)
-        
+    def getTensor(self, projectRoot: Path, fileName: str) -> Tensor:
+        return self._compute(projectRoot, fileName)
+
+    @override
+    def getImage(self, projectRoot: Path, fileName: str) -> Image.Image:
+        return to_pil_image(self.getTensor(projectRoot, fileName))
+
+    @override
+    def getBytes(self, projectRoot: Path, fileName: str) -> bytes:
+        buf = io.BytesIO()
+        self.getImage(projectRoot, fileName).save(buf, format="png")
+        return buf.getvalue()
+
+    def _compute(self, projectRoot: Path, fileName: str) -> Tensor:
         jpeg = self.parents[0].getTensor(projectRoot, fileName)
-        sobel_sum = self.parents[1].getTensor(projectRoot, fileName)
-        
-        mask = 1.0 - sobel_sum
+        mask = self.parents[1].getTensor(projectRoot, fileName)
         
         blurred = gaussian_blur(jpeg, kernel_size=5)
         
         result = blurred * mask + jpeg * (1.0 - mask)
         
-        pilImg = to_pil_image(result)
-        pilImg.save(outputPath, format="png")
+        return result
+
+
+@final
+class WeightedMaskNode(Node):
+    def __init__(self, log: Logger | None = None):
+        super().__init__("weighted_mask", ".png", [PngNode(log), WeightedBlurNode(log)], log)
+
+    @override
+    def getTensor(self, projectRoot: Path, fileName: str) -> Tensor:
+        return self._compute(projectRoot, fileName)
+
+    @override
+    def getImage(self, projectRoot: Path, fileName: str) -> Image.Image:
+        return to_pil_image(self.getTensor(projectRoot, fileName))
+
+    @override
+    def getBytes(self, projectRoot: Path, fileName: str) -> bytes:
+        buf = io.BytesIO()
+        self.getImage(projectRoot, fileName).save(buf, format="png")
+        return buf.getvalue()
+
+    def _compute(self, projectRoot: Path, fileName: str) -> Tensor:
+        png = self.parents[0].getTensor(projectRoot, fileName)
+        weighted_blur = self.parents[1].getTensor(projectRoot, fileName)
+        
+        # PngNode returns tensor in [0, 1] range?
+        # Node.getTensor uses to_tensor(Image.open(...)) which scales to [0, 1].
+        # PngNode inherits Node.getTensor.
+        
+        diff = torch.clamp(png - weighted_blur + 0.5, 0, 1)
+        
+        # Shift to visualize negative values? Or absolute difference?
+        # "computes the original png minus the weighted-blur"
+        # Usually for visualization we might want abs(diff) or diff + 0.5.
+        # But let's stick to literal subtraction.
+        # If result is negative, to_pil_image clips to 0.
+        # Let's assume user wants simple subtraction.
+        # Wait, usually "mask" implies something to be used later, or visualized.
+        # If it's "original - blur", it's high frequency details.
+        # Let's add 0.5 to center it? Or just abs?
+        # The prompt says "computes the original png minus the weighted-blur".
+        # I will do exactly that.
+        
+        return diff

@@ -6,6 +6,8 @@ export const enum WeightedBlurType {
     Mask = 'mask',
     Sum = 'sobel-sum',
     WeightedBlur = 'weighted-blur',
+    SobelMask = 'sobel-mask',
+    WeightedMask = 'weighted-mask',
 }
 
 /** @returns a blob url to the image in the current project that is fetched from the server */
