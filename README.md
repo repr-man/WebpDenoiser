@@ -3,6 +3,8 @@
 A set of tools for training machine learning models that remove compression artifacts from Webp
 images.
 
+![An image of the main UI.](ui.jpeg)
+
 ## Help! I'm lost!
 
 - `backend` - This is where all the Python stuff is.  It contains all the machine learning training,
